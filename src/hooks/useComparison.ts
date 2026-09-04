@@ -1,0 +1,429 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CompareEditorHandle } from '../components/DiffEditor/DiffEditor';
+import { stripTrailingBlankLines } from '../diff/alignTexts';
+import {
+  buildComparisonReportData,
+  computeLineDiff,
+  createEmptyLineDiffResult,
+  createReportCsv,
+  createReportText,
+  createUnifiedDiff,
+} from '../diff';
+import { computeComparisonStats } from '../diff/stats';
+import type { DownloadKind } from '../types';
+import type { ShareLinkResult } from '../types/share';
+import {
+  downloadTextFile,
+  filenameForLanguage,
+} from '../utils/download';
+import { resolveEditorLanguage } from '../utils/editorConfig';
+import {
+  buildShareLink,
+  getShareRouteMeta,
+  loadSharedComparisonFromUrl,
+  loadSharedComparisonFromUrlSync,
+  needsAsyncShareLoad,
+} from '../utils/share/shareLink';
+import {
+  clearComparisonDraft,
+  loadComparisonDraft,
+  saveComparisonDraft,
+} from '../utils/comparisonStorage';
+import type { ThemeMode } from '../types';
+import { useEditorSettings } from './useEditorSettings';
+import { useToast } from './useToast';
+
+const LARGE_FILE_LINE_THRESHOLD = 5000;
+
+export type ComparisonPhase = 'idle' | 'compared' | 'stale';
+
+function readInitialComparison(): { original: string; modified: string } {
+  const shared = loadSharedComparisonFromUrlSync();
+  if (shared) {
+    return { original: shared.original, modified: shared.modified };
+  }
+  return loadComparisonDraft();
+}
+
+function initialPhase(): ComparisonPhase {
+  const shared = loadSharedComparisonFromUrlSync();
+  if (shared?.original.trim() && shared?.modified.trim()) return 'compared';
+  return 'idle';
+}
+
+function countLines(text: string): number {
+  if (!text) return 0;
+  return text.split('\n').length;
+}
+
+export function useComparison(
+  theme: ThemeMode,
+  applySharedTheme?: (theme: ThemeMode) => void,
+) {
+  const initial = readInitialComparison();
+  const startingPhase = initialPhase();
+
+  const [original, setOriginal] = useState(initial.original);
+  const [modified, setModified] = useState(initial.modified);
+  const [phase, setPhase] = useState<ComparisonPhase>(startingPhase);
+  const [snapshot, setSnapshot] = useState(() =>
+    startingPhase === 'compared'
+      ? { original: initial.original, modified: initial.modified }
+      : { original: '', modified: '' },
+  );
+  const [compareVersion, setCompareVersion] = useState(
+    startingPhase === 'compared' ? 1 : 0,
+  );
+  const [isComparing, setIsComparing] = useState(false);
+  const [sharedView, setSharedView] = useState<{
+    displayId: string;
+    localOnly: boolean;
+    hosted?: boolean;
+  } | null>(() => getShareRouteMeta());
+  const [isLoadingShare, setIsLoadingShare] = useState(needsAsyncShareLoad);
+  const { settings, updateSettings } = useEditorSettings();
+  const { showToast } = useToast();
+  const editorRef = useRef<CompareEditorHandle>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function applySharedPayload() {
+      const shared = await loadSharedComparisonFromUrl();
+      if (cancelled || !shared) {
+        setIsLoadingShare(false);
+        return;
+      }
+
+      updateSettings({
+        ...(shared.language !== undefined && { language: shared.language }),
+        ...(shared.tabSize !== undefined && { tabSize: shared.tabSize }),
+        ...(shared.insertSpaces !== undefined && {
+          insertSpaces: shared.insertSpaces,
+        }),
+      });
+      if (shared.theme === 'light' || shared.theme === 'dark') {
+        applySharedTheme?.(shared.theme);
+      }
+
+      setOriginal(shared.original);
+      setModified(shared.modified);
+      setSharedView(getShareRouteMeta());
+      if (shared.original.trim() && shared.modified.trim()) {
+        setSnapshot({ original: shared.original, modified: shared.modified });
+        setPhase('compared');
+        setCompareVersion((version) => version + 1);
+      }
+      setIsLoadingShare(false);
+    }
+
+    if (needsAsyncShareLoad()) {
+      void applySharedPayload();
+    } else {
+      const shared = loadSharedComparisonFromUrlSync();
+      if (!shared) return;
+
+      updateSettings({
+        ...(shared.language !== undefined && { language: shared.language }),
+        ...(shared.tabSize !== undefined && { tabSize: shared.tabSize }),
+        ...(shared.insertSpaces !== undefined && {
+          insertSpaces: shared.insertSpaces,
+        }),
+      });
+      if (shared.theme === 'light' || shared.theme === 'dark') {
+        applySharedTheme?.(shared.theme);
+      }
+      setSharedView(getShareRouteMeta());
+      if (shared.original.trim() && shared.modified.trim()) {
+        setSnapshot({ original: shared.original, modified: shared.modified });
+        setPhase('compared');
+        setCompareVersion((version) => version + 1);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [updateSettings, applySharedTheme]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      saveComparisonDraft(original, modified);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [original, modified]);
+
+  useEffect(() => {
+    if (!original.trim() && !modified.trim()) {
+      setPhase('idle');
+      setSnapshot({ original: '', modified: '' });
+      setCompareVersion(0);
+      return;
+    }
+
+    const normOriginal = stripTrailingBlankLines(original);
+    const normModified = stripTrailingBlankLines(modified);
+    const normSnapOriginal = stripTrailingBlankLines(snapshot.original);
+    const normSnapModified = stripTrailingBlankLines(snapshot.modified);
+
+    if (phase === 'compared') {
+      if (
+        normOriginal !== normSnapOriginal ||
+        normModified !== normSnapModified
+      ) {
+        setPhase('stale');
+      }
+      return;
+    }
+
+    if (phase === 'stale') {
+      if (
+        normOriginal === normSnapOriginal &&
+        normModified === normSnapModified
+      ) {
+        setPhase('compared');
+      }
+    }
+  }, [original, modified, phase, snapshot.original, snapshot.modified]);
+
+  const diffResult = useMemo(() => {
+    if (phase === 'idle') return createEmptyLineDiffResult();
+    try {
+      return computeLineDiff(snapshot.original, snapshot.modified);
+    } catch {
+      return createEmptyLineDiffResult();
+    }
+  }, [phase, snapshot, compareVersion]);
+
+  const comparisonStats = useMemo(
+    () => computeComparisonStats(diffResult),
+    [diffResult],
+  );
+
+  const reportData = useMemo(
+    () => buildComparisonReportData(diffResult),
+    [diffResult],
+  );
+
+  const reportText = useMemo(() => {
+    if (phase === 'idle') {
+      return createReportText(original, modified, reportData, diffResult);
+    }
+    return createReportText(
+      snapshot.original,
+      snapshot.modified,
+      reportData,
+      diffResult,
+    );
+  }, [phase, original, modified, snapshot, reportData, diffResult]);
+
+  const reportCsv = useMemo(() => createReportCsv(reportData), [reportData]);
+
+  const hasAnyContent = Boolean(original.trim() || modified.trim());
+  const hasBothContent = Boolean(original.trim() && modified.trim());
+  const isEmpty = !hasAnyContent;
+  const showComparisonResults = phase !== 'idle';
+  const showCompareBar = hasAnyContent && (phase === 'idle' || phase === 'stale');
+  const compareBarMode: 'compare' | 'refresh' = phase === 'stale' ? 'refresh' : 'compare';
+  const canRunCompare = hasBothContent && !isComparing;
+
+  const isLargeFile =
+    countLines(original) > LARGE_FILE_LINE_THRESHOLD ||
+    countLines(modified) > LARGE_FILE_LINE_THRESHOLD;
+
+  const runComparison = useCallback(async () => {
+    const live = editorRef.current?.getRawContents();
+    const sourceOriginal = live?.original ?? original;
+    const sourceModified = live?.modified ?? modified;
+
+    if (!sourceOriginal.trim() || !sourceModified.trim()) {
+      showToast('Enter code in both panes to compare', 'info');
+      return;
+    }
+
+    setIsComparing(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 120));
+
+    const normalizedOriginal = stripTrailingBlankLines(sourceOriginal);
+    const normalizedModified = stripTrailingBlankLines(sourceModified);
+
+    if (normalizedOriginal !== original) setOriginal(normalizedOriginal);
+    if (normalizedModified !== modified) setModified(normalizedModified);
+
+    setSnapshot({
+      original: normalizedOriginal,
+      modified: normalizedModified,
+    });
+    setCompareVersion((version) => version + 1);
+    setPhase('compared');
+    setIsComparing(false);
+
+    showToast(
+      phase === 'stale' ? 'Comparison refreshed' : 'Comparison complete',
+      'success',
+    );
+  }, [original, modified, phase, showToast]);
+
+  const compare = runComparison;
+
+  const swap = useCallback(() => {
+    setOriginal(modified);
+    setModified(original);
+    if (phase === 'compared') {
+      setPhase('stale');
+    }
+    showToast('Swapped original and modified', 'info');
+  }, [original, modified, phase, showToast]);
+
+  const clear = useCallback(() => {
+    setOriginal('');
+    setModified('');
+    setSnapshot({ original: '', modified: '' });
+    setPhase('idle');
+    setCompareVersion(0);
+    editorRef.current?.clearBoth();
+    clearComparisonDraft();
+    showToast('Editors cleared', 'info');
+  }, [showToast]);
+
+  const format = useCallback(async () => {
+    try {
+      await editorRef.current?.formatBoth();
+      if (phase === 'compared') {
+        setPhase('stale');
+      }
+      showToast('Formatted both editors', 'success');
+    } catch {
+      showToast('Format failed for this language', 'error');
+    }
+  }, [phase, showToast]);
+
+  const getShareLink = useCallback(async () => {
+    return buildShareLink(original, modified, settings, theme);
+  }, [original, modified, settings, theme]);
+
+  const share = useCallback(async () => {
+    try {
+      const result = await getShareLink();
+      await navigator.clipboard.writeText(result.url);
+      const hint = result.hosted
+        ? ' (short link)'
+        : result.localOnly
+          ? ' (uses URL hash)'
+          : '';
+      showToast(`Share link copied · ${result.displayId}${hint}`, 'success');
+      return result;
+    } catch {
+      showToast('Could not copy share link', 'error');
+      return null;
+    }
+  }, [getShareLink, showToast]);
+
+  const copyShareLink = useCallback(
+    async (link?: ShareLinkResult) => {
+      try {
+        const result = link ?? (await getShareLink());
+        await navigator.clipboard.writeText(result.url);
+        return true;
+      } catch {
+        showToast('Could not copy share link', 'error');
+        return false;
+      }
+    },
+    [getShareLink, showToast],
+  );
+
+  const startNew = useCallback(() => {
+    setSharedView(null);
+    setOriginal('');
+    setModified('');
+    setSnapshot({ original: '', modified: '' });
+    setPhase('idle');
+    setCompareVersion(0);
+    editorRef.current?.clearBoth();
+    clearComparisonDraft();
+    window.history.replaceState({}, '', '/');
+    showToast('Started new comparison', 'info');
+  }, [showToast]);
+
+  const dismissSharedBanner = useCallback(() => {
+    setSharedView(null);
+  }, []);
+
+  const download = useCallback(
+    (kind: DownloadKind) => {
+      const language = resolveEditorLanguage(
+        settings.language,
+        original,
+        modified,
+      );
+
+      try {
+        switch (kind) {
+          case 'original':
+            downloadTextFile(
+              filenameForLanguage('original', language),
+              original,
+            );
+            break;
+          case 'modified':
+            downloadTextFile(
+              filenameForLanguage('modified', language),
+              modified,
+            );
+            break;
+          case 'diff':
+            downloadTextFile(
+              'comparison.diff',
+              createUnifiedDiff(original, modified),
+            );
+            break;
+          case 'report':
+            downloadTextFile('comparison-report.txt', reportText);
+            break;
+        }
+        showToast('Download started', 'success');
+      } catch {
+        showToast('Download failed', 'error');
+      }
+    },
+    [original, modified, settings.language, reportText, showToast],
+  );
+
+  return {
+    original,
+    modified,
+    setOriginal,
+    setModified,
+    settings,
+    updateSettings,
+    compareVersion,
+    phase,
+    showComparisonResults,
+    showCompareBar,
+    compareBarMode,
+    canRunCompare,
+    compare,
+    swap,
+    clear,
+    format,
+    share,
+    getShareLink,
+    copyShareLink,
+    download,
+    startNew,
+    dismissSharedBanner,
+    editorRef,
+    diffResult,
+    comparisonStats,
+    reportData,
+    reportText,
+    reportCsv,
+    sharedView,
+    isLoadingShare,
+    isEmpty,
+    isLargeFile,
+    isComparing,
+  };
+};

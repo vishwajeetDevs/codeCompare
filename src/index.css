@@ -1,0 +1,430 @@
+@import 'tailwindcss';
+
+:root,
+[data-theme='dark'] {
+  --surface-1: #1e1e1e;
+  --surface-2: #252526;
+  --surface-3: #2d2d2d;
+  --border: #3c3c3c;
+  --text-primary: #e0e0e0;
+  --text-secondary: #cccccc;
+  --text-muted: #858585;
+  --accent: #0e639c;
+  --accent-hover: #1177bb;
+  --accent-muted: #094771;
+
+  --diff-added-bg: rgba(56, 170, 90, 0.32);
+  --diff-removed-bg: rgba(210, 90, 90, 0.34);
+  --diff-modified-bg: rgba(210, 165, 55, 0.32);
+  --diff-char-added-bg: rgba(72, 190, 105, 0.58);
+  --diff-char-removed-bg: rgba(230, 115, 115, 0.62);
+  --diff-blank-bg: rgba(100, 100, 100, 0.38);
+  --diff-blank-pattern: rgba(85, 85, 85, 0.28);
+  --diff-added-marker: #7ec97e;
+  --diff-removed-marker: #e06c75;
+  --diff-modified-marker: #dcdcaa;
+  --diff-added-overview: #4ec994;
+  --diff-removed-overview: #e06c75;
+  --diff-modified-overview: #e5c07b;
+  --diff-active-border: #4daafc;
+  --diff-active-bg: rgba(77, 170, 252, 0.14);
+
+  --loc-track-bg: #2a2a2a;
+  --loc-marker-added: var(--diff-added-overview);
+  --loc-marker-removed: var(--diff-removed-overview);
+  --loc-marker-modified: var(--diff-modified-overview);
+  --loc-marker-blank: rgba(100, 100, 100, 0.5);
+  --loc-viewport-bg: rgba(120, 140, 200, 0.16);
+  --loc-viewport-border: rgba(120, 140, 200, 0.38);
+  --loc-active-ring: #4daafc;
+
+  --toast-success-bg: rgba(20, 83, 45, 0.95);
+  --toast-success-border: rgba(34, 197, 94, 0.35);
+  --toast-success-text: #dcfce7;
+  --toast-error-bg: rgba(127, 29, 29, 0.95);
+  --toast-error-border: rgba(248, 113, 113, 0.35);
+  --toast-error-text: #fee2e2;
+}
+
+[data-theme='light'] {
+  --surface-1: #f6f5f2;
+  --surface-2: #eeede8;
+  --surface-3: #e4e3dd;
+  --border: #d0cfc9;
+  --text-primary: #1f2328;
+  --text-secondary: #424a53;
+  --text-muted: #656d76;
+  --accent: #0066b8;
+  --accent-hover: #005a9e;
+  --accent-muted: #dce8f5;
+
+  --diff-added-bg: rgba(74, 222, 128, 0.48);
+  --diff-removed-bg: rgba(255, 120, 120, 0.5);
+  --diff-modified-bg: rgba(255, 230, 100, 0.72);
+  --diff-char-added-bg: rgba(34, 197, 94, 0.62);
+  --diff-char-removed-bg: rgba(255, 100, 100, 0.65);
+  --diff-blank-bg: #c4c4c4;
+  --diff-blank-pattern: rgba(160, 160, 160, 0.45);
+  --diff-added-marker: #22c55e;
+  --diff-removed-marker: #ff5555;
+  --diff-modified-marker: #f59e0b;
+  --diff-added-overview: #16a34a;
+  --diff-removed-overview: #ef4444;
+  --diff-modified-overview: #eab308;
+  --diff-active-border: #0969da;
+  --diff-active-bg: rgba(9, 105, 218, 0.1);
+
+  --loc-track-bg: #ffffff;
+  --loc-marker-added: var(--diff-added-overview);
+  --loc-marker-removed: var(--diff-removed-overview);
+  --loc-marker-modified: var(--diff-modified-overview);
+  --loc-marker-blank: rgba(180, 180, 180, 0.55);
+  --loc-viewport-bg: rgba(130, 80, 223, 0.14);
+  --loc-viewport-border: rgba(130, 80, 223, 0.35);
+  --loc-active-ring: #0969da;
+
+  --toast-success-bg: rgba(240, 253, 244, 0.98);
+  --toast-success-border: rgba(34, 197, 94, 0.45);
+  --toast-success-text: #14532d;
+  --toast-error-bg: rgba(254, 242, 242, 0.98);
+  --toast-error-border: rgba(248, 113, 113, 0.45);
+  --toast-error-text: #7f1d1d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background-color: var(--surface-1);
+  color: var(--text-secondary);
+}
+
+.btn-secondary {
+  @apply cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-3)] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+button:not(:disabled),
+select,
+[role='tab'],
+label:has(input[type='checkbox']),
+label:has(input[type='radio']),
+a[href] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Line diff highlighting */
+.monaco-editor .line-diff-added {
+  background-color: var(--diff-added-bg) !important;
+}
+
+.monaco-editor .line-diff-removed {
+  background-color: var(--diff-removed-bg) !important;
+}
+
+.monaco-editor .line-diff-modified-subtle {
+  background-color: var(--diff-modified-bg) !important;
+}
+
+.monaco-editor .line-diff-blank {
+  background-color: var(--diff-blank-bg) !important;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 5px,
+    var(--diff-blank-pattern) 5px,
+    var(--diff-blank-pattern) 6px
+  ) !important;
+}
+
+.monaco-editor .char-diff-removed {
+  background-color: var(--diff-char-removed-bg) !important;
+  border-radius: 2px;
+}
+
+.monaco-editor .char-diff-added {
+  background-color: var(--diff-char-added-bg) !important;
+  border-radius: 2px;
+}
+
+.monaco-editor .line-diff-marker-added::before {
+  content: '+';
+  color: var(--diff-added-marker);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.monaco-editor .line-diff-marker-removed::before {
+  content: '-';
+  color: var(--diff-removed-marker);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.monaco-editor .line-diff-marker-modified::before {
+  content: '~';
+  color: var(--diff-modified-marker);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.monaco-editor .line-diff-active-change {
+  outline: 2px solid var(--diff-active-border) !important;
+  outline-offset: -2px;
+  background-color: var(--diff-active-bg) !important;
+}
+
+/* Keep Monaco find widget within each editor pane */
+.editor-pane {
+  position: relative;
+  isolation: isolate;
+}
+
+.editor-pane:focus-within {
+  z-index: 2;
+}
+
+.editor-pane .monaco-editor .find-widget {
+  z-index: 40 !important;
+  max-width: min(420px, calc(100% - 32px));
+}
+
+.editor-pane .monaco-editor .overflowingContentWidgets {
+  z-index: 40;
+}
+
+.editor-pane .monaco-editor .find-widget .monaco-findInput {
+  width: 220px;
+}
+
+.split-divider {
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--border);
+  transition: background-color 0.15s ease;
+}
+
+.split-divider:hover,
+.split-divider:active {
+  background: var(--accent);
+}
+
+/* Hide minimap and overview ruler overlays */
+.monaco-editor .minimap,
+.monaco-editor .decorationsOverviewRuler,
+.monaco-editor .minimap-slider,
+.monaco-editor .minimap-slider .minimap-slider-horizontal,
+.monaco-editor .minimap-slider .minimap-slider-vertical {
+  display: none !important;
+}
+
+/* Pointer cursor on Monaco interactive controls */
+.monaco-editor .margin-view-overlays .codicon,
+.monaco-editor .folding-decoration,
+.monaco-editor .minimap-decorations-layer,
+.monaco-editor .scrollbar .slider {
+  cursor: pointer;
+}
+
+.monaco-editor .find-widget .button,
+.monaco-editor .find-widget .monaco-checkbox {
+  cursor: pointer;
+}
+
+.share-popover-arrow {
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  width: 12px;
+  height: 12px;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+/* Toasts */
+.toast {
+  @apply flex items-center justify-between rounded-lg border px-4 py-3 text-sm shadow-lg;
+  animation: toast-in 0.25s ease-out;
+}
+
+.toast-success {
+  background: var(--toast-success-bg);
+  border-color: var(--toast-success-border);
+  color: var(--toast-success-text);
+}
+
+.toast-error {
+  background: var(--toast-error-bg);
+  border-color: var(--toast-error-border);
+  color: var(--toast-error-text);
+}
+
+.toast-info {
+  @apply border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-secondary)];
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+
+  .settings-panel-aside,
+  .settings-panel-backdrop {
+    transition: none !important;
+  }
+}
+
+/* Location pane minimap */
+.location-pane {
+  user-select: none;
+}
+
+.loc-track {
+  background: var(--loc-track-bg);
+  border-radius: 2px;
+  min-width: 0;
+}
+
+.loc-marker {
+  cursor: pointer;
+  border-radius: 1px;
+  transition: box-shadow 0.12s ease;
+}
+
+.loc-marker-blank {
+  background: var(--loc-marker-blank);
+}
+
+.loc-marker-added {
+  background: var(--loc-marker-added);
+}
+
+.loc-marker-removed {
+  background: var(--loc-marker-removed);
+}
+
+.loc-marker-modified {
+  background: var(--loc-marker-modified);
+}
+
+.loc-marker-active {
+  box-shadow:
+    0 0 0 1px var(--loc-active-ring),
+    0 0 0 2px var(--surface-2);
+  z-index: 2;
+}
+
+.loc-viewport-thumb {
+  background: var(--loc-viewport-bg);
+  border: 1px solid var(--loc-viewport-border);
+  border-radius: 2px;
+}
+
+/* Compare / Refresh Compare action bar */
+.compare-action-bar {
+  opacity: 0;
+  transform: translateY(calc(100% + 1rem));
+  transition:
+    opacity 0.28s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.compare-action-bar--visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: none;
+}
+
+.compare-action-bar__btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  backdrop-filter: blur(8px);
+  box-shadow:
+    0 6px 28px rgba(14, 99, 156, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.compare-action-bar__btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  box-shadow:
+    0 8px 32px rgba(14, 99, 156, 0.42),
+    0 2px 8px rgba(0, 0, 0, 0.14);
+  transform: translateY(-1px);
+}
+
+.compare-action-bar__btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.compare-action-bar__btn:disabled {
+  opacity: 0.55;
+}
+
+.compare-action-bar__label {
+  display: inline-block;
+  transition: opacity 0.2s ease;
+}
+
+.compare-action-bar__btn--refresh .compare-action-bar__label {
+  animation: compare-label-swap 0.32s ease;
+}
+
+@keyframes compare-label-swap {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-action-bar {
+    transition: opacity 0.15s ease;
+    transform: none;
+  }
+
+  .compare-action-bar--visible {
+    transform: none;
+  }
+
+  .compare-action-bar__btn--refresh .compare-action-bar__label {
+    animation: none;
+  }
+}
