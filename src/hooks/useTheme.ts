@@ -10,7 +10,7 @@ function readTheme(): ThemeMode {
   } catch {
     /* ignore */
   }
-  return 'dark';
+  return 'light';
 }
 
 export function useTheme() {

@@ -1,51 +1,6 @@
 @import 'tailwindcss';
 
 :root,
-[data-theme='dark'] {
-  --surface-1: #1e1e1e;
-  --surface-2: #252526;
-  --surface-3: #2d2d2d;
-  --border: #3c3c3c;
-  --text-primary: #e0e0e0;
-  --text-secondary: #cccccc;
-  --text-muted: #858585;
-  --accent: #0e639c;
-  --accent-hover: #1177bb;
-  --accent-muted: #094771;
-
-  --diff-added-bg: rgba(56, 170, 90, 0.32);
-  --diff-removed-bg: rgba(210, 90, 90, 0.34);
-  --diff-modified-bg: rgba(210, 165, 55, 0.32);
-  --diff-char-added-bg: rgba(72, 190, 105, 0.58);
-  --diff-char-removed-bg: rgba(230, 115, 115, 0.62);
-  --diff-blank-bg: rgba(100, 100, 100, 0.38);
-  --diff-blank-pattern: rgba(85, 85, 85, 0.28);
-  --diff-added-marker: #7ec97e;
-  --diff-removed-marker: #e06c75;
-  --diff-modified-marker: #dcdcaa;
-  --diff-added-overview: #4ec994;
-  --diff-removed-overview: #e06c75;
-  --diff-modified-overview: #e5c07b;
-  --diff-active-border: #4daafc;
-  --diff-active-bg: rgba(77, 170, 252, 0.14);
-
-  --loc-track-bg: #2a2a2a;
-  --loc-marker-added: var(--diff-added-overview);
-  --loc-marker-removed: var(--diff-removed-overview);
-  --loc-marker-modified: var(--diff-modified-overview);
-  --loc-marker-blank: rgba(100, 100, 100, 0.5);
-  --loc-viewport-bg: rgba(120, 140, 200, 0.16);
-  --loc-viewport-border: rgba(120, 140, 200, 0.38);
-  --loc-active-ring: #4daafc;
-
-  --toast-success-bg: rgba(20, 83, 45, 0.95);
-  --toast-success-border: rgba(34, 197, 94, 0.35);
-  --toast-success-text: #dcfce7;
-  --toast-error-bg: rgba(127, 29, 29, 0.95);
-  --toast-error-border: rgba(248, 113, 113, 0.35);
-  --toast-error-text: #fee2e2;
-}
-
 [data-theme='light'] {
   --surface-1: #f6f5f2;
   --surface-2: #eeede8;
@@ -89,6 +44,51 @@
   --toast-error-bg: rgba(254, 242, 242, 0.98);
   --toast-error-border: rgba(248, 113, 113, 0.45);
   --toast-error-text: #7f1d1d;
+}
+
+[data-theme='dark'] {
+  --surface-1: #1e1e1e;
+  --surface-2: #252526;
+  --surface-3: #2d2d2d;
+  --border: #3c3c3c;
+  --text-primary: #e0e0e0;
+  --text-secondary: #cccccc;
+  --text-muted: #858585;
+  --accent: #0e639c;
+  --accent-hover: #1177bb;
+  --accent-muted: #094771;
+
+  --diff-added-bg: rgba(56, 170, 90, 0.32);
+  --diff-removed-bg: rgba(210, 90, 90, 0.34);
+  --diff-modified-bg: rgba(210, 165, 55, 0.32);
+  --diff-char-added-bg: rgba(72, 190, 105, 0.58);
+  --diff-char-removed-bg: rgba(230, 115, 115, 0.62);
+  --diff-blank-bg: rgba(100, 100, 100, 0.38);
+  --diff-blank-pattern: rgba(85, 85, 85, 0.28);
+  --diff-added-marker: #7ec97e;
+  --diff-removed-marker: #e06c75;
+  --diff-modified-marker: #dcdcaa;
+  --diff-added-overview: #4ec994;
+  --diff-removed-overview: #e06c75;
+  --diff-modified-overview: #e5c07b;
+  --diff-active-border: #4daafc;
+  --diff-active-bg: rgba(77, 170, 252, 0.14);
+
+  --loc-track-bg: #2a2a2a;
+  --loc-marker-added: var(--diff-added-overview);
+  --loc-marker-removed: var(--diff-removed-overview);
+  --loc-marker-modified: var(--diff-modified-overview);
+  --loc-marker-blank: rgba(100, 100, 100, 0.5);
+  --loc-viewport-bg: rgba(120, 140, 200, 0.16);
+  --loc-viewport-border: rgba(120, 140, 200, 0.38);
+  --loc-active-ring: #4daafc;
+
+  --toast-success-bg: rgba(20, 83, 45, 0.95);
+  --toast-success-border: rgba(34, 197, 94, 0.35);
+  --toast-success-text: #dcfce7;
+  --toast-error-bg: rgba(127, 29, 29, 0.95);
+  --toast-error-border: rgba(248, 113, 113, 0.35);
+  --toast-error-text: #fee2e2;
 }
 
 html,
