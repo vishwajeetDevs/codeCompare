@@ -38,9 +38,6 @@ export async function buildShareLink(
 
   const preview = previewText(original, modified);
   const remoteId = await createRemoteShare(encoded, preview);
-  if (!remoteId) {
-    throw new Error('Could not create share link');
-  }
 
   saveShareRecord({
     id: remoteId,

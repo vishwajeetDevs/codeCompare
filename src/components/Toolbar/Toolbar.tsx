@@ -3,6 +3,7 @@ import { MONACO_LANGUAGES, type EditorSettings } from '../../types/editor';
 import type { ThemeMode } from '../../types';
 import type { ShareLinkResult } from '../../types/share';
 import { ShareIcon, SharePopover } from '../ShareDialog/SharePopover';
+import { ShareApiError } from '../../utils/share/remoteShare';
 import { ChangeNavControls } from './ChangeNavBar';
 import { SPLIT_DIVIDER_WIDTH_PX } from '../Layout/ResizableSplitPane';
 
@@ -112,6 +113,8 @@ export function Toolbar({
   const [shareOpen, setShareOpen] = useState(false);
   const [shareLink, setShareLink] = useState<ShareLinkResult | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareErrorHint, setShareErrorHint] = useState<string | null>(null);
 
   const themeLabel =
     theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode';
@@ -120,11 +123,23 @@ export function Toolbar({
     setShareOpen(true);
     setShareLoading(true);
     setShareLink(null);
+    setShareError(null);
+    setShareErrorHint(null);
 
     try {
       const link = await onGetShareLink();
       setShareLink(link);
       await onCopyShareLink(link);
+    } catch (error) {
+      setShareLink(null);
+      if (error instanceof ShareApiError) {
+        setShareError(error.message);
+        setShareErrorHint(error.hint ?? null);
+      } else if (error instanceof Error) {
+        setShareError(error.message);
+      } else {
+        setShareError('Could not create link');
+      }
     } finally {
       setShareLoading(false);
     }
@@ -212,6 +227,8 @@ export function Toolbar({
             open={shareOpen}
             shareLink={shareLink}
             loading={shareLoading}
+            error={shareError}
+            errorHint={shareErrorHint}
             onClose={closeShare}
             onCopy={onCopyShareLink}
           />

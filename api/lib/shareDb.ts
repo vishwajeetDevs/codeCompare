@@ -8,9 +8,26 @@ const MAX_DATA_BYTES = 1_500_000;
 let schemaReady: Promise<void> | null = null;
 
 export function getShareDb(): NeonQueryFunction<false, false> | null {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = resolveDatabaseUrl();
   if (!databaseUrl) return null;
   return neon(databaseUrl);
+}
+
+function resolveDatabaseUrl(): string | null {
+  const candidates = [
+    process.env.DATABASE_URL,
+    process.env.POSTGRES_URL,
+    process.env.NEON_DATABASE_URL,
+    process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
+  ];
+
+  for (const value of candidates) {
+    const trimmed = value?.trim();
+    if (trimmed) return trimmed;
+  }
+
+  return null;
 }
 
 export async function ensureShareSchema(

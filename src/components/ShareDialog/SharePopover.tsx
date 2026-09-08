@@ -6,6 +6,8 @@ interface SharePopoverProps {
   open: boolean;
   shareLink: ShareLinkResult | null;
   loading?: boolean;
+  error?: string | null;
+  errorHint?: string | null;
   onClose: () => void;
   onCopy: (link?: ShareLinkResult) => Promise<boolean>;
 }
@@ -40,6 +42,8 @@ export function SharePopover({
   open,
   shareLink,
   loading = false,
+  error = null,
+  errorHint = null,
   onClose,
   onCopy,
 }: SharePopoverProps) {
@@ -118,15 +122,20 @@ export function SharePopover({
 
         <div
           className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--accent-muted)] px-3 py-2.5"
-          title={shareLink?.url}
+          title={shareLink?.url ?? errorHint ?? undefined}
         >
           <p className="truncate font-mono text-xs text-[var(--text-secondary)]">
             {loading
               ? '…'
               : shareLink
                 ? formatShareUrlForDisplay(shareLink)
-                : 'Could not create link'}
+                : error ?? 'Could not create link'}
           </p>
+          {!loading && !shareLink && errorHint ? (
+            <p className="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">
+              {errorHint}
+            </p>
+          ) : null}
         </div>
 
         <button
