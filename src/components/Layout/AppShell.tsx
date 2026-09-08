@@ -50,7 +50,7 @@ export function AppShell() {
   );
 
   const shouldAlign =
-    comparison.showComparisonResults &&
+    comparison.showAlignedComparison &&
     comparison.original.trim().length > 0 &&
     comparison.modified.trim().length > 0;
 
@@ -119,10 +119,10 @@ export function AppShell() {
         theme={theme}
         splitRatio={splitRatio}
         changeIndex={
-          comparison.showComparisonResults ? Math.max(changeNav.activeIndex, 0) : 0
+          comparison.showAlignedComparison ? Math.max(changeNav.activeIndex, 0) : 0
         }
         totalChanges={
-          comparison.showComparisonResults ? changeNav.totalChanges : 0
+          comparison.showAlignedComparison ? changeNav.totalChanges : 0
         }
         onSettingsChange={comparison.updateSettings}
         onToggleTheme={toggleTheme}
@@ -154,8 +154,8 @@ export function AppShell() {
 
       {shortcutButtonsVisible && (
         <MobileChangeNav
-          changeIndex={comparison.showComparisonResults ? Math.max(changeNav.activeIndex, 0) : 0}
-          totalChanges={comparison.showComparisonResults ? changeNav.totalChanges : 0}
+          changeIndex={comparison.showAlignedComparison ? Math.max(changeNav.activeIndex, 0) : 0}
+          totalChanges={comparison.showAlignedComparison ? changeNav.totalChanges : 0}
           onPrevChange={changeNav.goPrev}
           onNextChange={changeNav.goNext}
           onCloseFind={closeFindWidgets}
@@ -177,7 +177,7 @@ export function AppShell() {
             settings={comparison.settings}
             theme={theme}
             compareVersion={comparison.compareVersion}
-            showDiffHighlights={comparison.showComparisonResults}
+            showDiffHighlights={comparison.showAlignedComparison}
             displayDiffResult={comparison.diffResult}
             activeChangeIndex={changeNav.activeIndex}
             activeChangeAlignedLine={changeNav.activeAlignedLine}
@@ -200,7 +200,7 @@ export function AppShell() {
           />
         </div>
 
-        {locationPaneVisible && !isMobile && comparison.showComparisonResults && (
+        {locationPaneVisible && !isMobile && comparison.showAlignedComparison && (
           <LocationPane
             alignedResult={locationResult}
             groups={changeNav.groups}
@@ -220,6 +220,7 @@ export function AppShell() {
         locationPaneVisible={locationPaneVisible}
         shortcutButtonsVisible={shortcutButtonsVisible}
         onClose={closeSettings}
+        onSwap={comparison.swap}
         onWordWrapChange={(enabled) =>
           comparison.updateSettings({ wordWrap: enabled ? 'on' : 'off' })
         }

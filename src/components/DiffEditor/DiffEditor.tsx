@@ -64,6 +64,7 @@ export interface CompareEditorHandle {
   closeFindWidgets: () => void;
   scrollToRatio: (ratio: number) => void;
   getRawContents: () => { original: string; modified: string };
+  swapPanes: (nextOriginal: string, nextModified: string) => void;
 }
 
 function applyModelSettings(
@@ -388,6 +389,17 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         });
       },
       getRawContents: getRawContentsFromEditors,
+      swapPanes: (nextOriginal: string, nextModified: string) => {
+        const orig = originalRef.current;
+        const mod = modifiedRef.current;
+        if (!orig || !mod) return;
+
+        closeFindWidget(orig);
+        closeFindWidget(mod);
+        lastExternalSyncKeyRef.current = '';
+        syncEditorValue(orig, nextOriginal, isSyncingRef);
+        syncEditorValue(mod, nextModified, isSyncingRef);
+      },
     }));
 
     const clearDecorations = () => {

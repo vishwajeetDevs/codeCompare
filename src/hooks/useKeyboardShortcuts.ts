@@ -71,8 +71,8 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [enabled, handlers]);
 }
 

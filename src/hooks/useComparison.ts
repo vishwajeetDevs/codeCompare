@@ -224,6 +224,7 @@ export function useComparison(
   const hasBothContent = Boolean(original.trim() && modified.trim());
   const isEmpty = !hasAnyContent;
   const showComparisonResults = phase !== 'idle';
+  const showAlignedComparison = phase === 'compared';
   const showCompareBar = hasAnyContent && (phase === 'idle' || phase === 'stale');
   const compareBarMode: 'compare' | 'refresh' = phase === 'stale' ? 'refresh' : 'compare';
   const canRunCompare = hasBothContent && !isComparing;
@@ -268,11 +269,26 @@ export function useComparison(
   const compare = runComparison;
 
   const swap = useCallback(() => {
-    setOriginal(modified);
-    setModified(original);
-    if (phase === 'compared') {
+    const live = editorRef.current?.getRawContents();
+    const currentOriginal = live?.original ?? original;
+    const currentModified = live?.modified ?? modified;
+
+    if (!currentOriginal && !currentModified) {
+      showToast('Nothing to swap', 'info');
+      return;
+    }
+
+    const nextOriginal = currentModified;
+    const nextModified = currentOriginal;
+
+    setOriginal(nextOriginal);
+    setModified(nextModified);
+
+    if (phase !== 'idle') {
       setPhase('stale');
     }
+
+    editorRef.current?.swapPanes(nextOriginal, nextModified);
     showToast('Swapped original and modified', 'info');
   }, [original, modified, phase, showToast]);
 
@@ -397,6 +413,7 @@ export function useComparison(
     compareVersion,
     phase,
     showComparisonResults,
+    showAlignedComparison,
     showCompareBar,
     compareBarMode,
     canRunCompare,

@@ -6,6 +6,7 @@ interface SettingsPanelProps {
   locationPaneVisible: boolean;
   shortcutButtonsVisible: boolean;
   onClose: () => void;
+  onSwap: () => void;
   onWordWrapChange: (enabled: boolean) => void;
   onLocationPaneVisibleChange: (visible: boolean) => void;
   onShortcutButtonsVisibleChange: (visible: boolean) => void;
@@ -17,6 +18,7 @@ export function SettingsPanel({
   locationPaneVisible,
   shortcutButtonsVisible,
   onClose,
+  onSwap,
   onWordWrapChange,
   onLocationPaneVisibleChange,
   onShortcutButtonsVisibleChange,
@@ -109,6 +111,17 @@ export function SettingsPanel({
             />
             Shortcut buttons
           </label>
+
+          <button
+            type="button"
+            className="btn-secondary flex w-full items-center justify-between !py-2"
+            onClick={onSwap}
+          >
+            <span>Swap panes</span>
+            <span className="text-xs font-normal text-[var(--text-muted)]">
+              Ctrl+Shift+S
+            </span>
+          </button>
         </div>
       </aside>
     </div>
