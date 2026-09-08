@@ -54,8 +54,8 @@ export async function ensureShareSchema(
 }
 
 export function createShareId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(SHARE_ID_LENGTH));
-  return Array.from(bytes, (byte) => ID_ALPHABET[byte % ID_ALPHABET.length]).join(
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(SHARE_ID_LENGTH));
+  return Array.from(bytes, (byte: number) => ID_ALPHABET[byte % ID_ALPHABET.length]).join(
     '',
   );
 }

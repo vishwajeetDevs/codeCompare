@@ -10,6 +10,11 @@
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 10
+    }
+  },
   "headers": [
     {
       "source": "/assets/(.*)",
