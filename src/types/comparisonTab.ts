@@ -3,6 +3,8 @@ import type { EditorSettings } from './editor';
 import { DEFAULT_EDITOR_SETTINGS } from '../utils/editorConfig';
 
 export const DEFAULT_TAB_TITLE = 'Untitled';
+export const DEFAULT_ORIGINAL_LABEL = 'Untitled';
+export const DEFAULT_MODIFIED_LABEL = 'Untitled';
 
 export interface ComparisonSnapshot {
   original: string;
@@ -13,6 +15,8 @@ export interface ComparisonTabState {
   id: string;
   title: string;
   titleCustomized: boolean;
+  originalLabel: string;
+  modifiedLabel: string;
   original: string;
   modified: string;
   phase: ComparisonPhase;
@@ -29,6 +33,11 @@ export function normalizeTabTitle(title: string): string {
   return trimmed || DEFAULT_TAB_TITLE;
 }
 
+export function normalizePaneLabel(title: string, fallback: string): string {
+  const trimmed = title.replace(/\s+/g, ' ').trim();
+  return trimmed || fallback;
+}
+
 export function createComparisonTab(
   partial?: Partial<ComparisonTabState>,
 ): ComparisonTabState {
@@ -37,11 +46,27 @@ export function createComparisonTab(
   const phase = partial?.phase ?? 'idle';
   const compareVersion = partial?.compareVersion ?? (phase === 'compared' ? 1 : 0);
   const titleCustomized = partial?.titleCustomized ?? false;
+  const originalLabel =
+    !partial?.originalLabel || partial.originalLabel === 'Original'
+      ? DEFAULT_ORIGINAL_LABEL
+      : partial.originalLabel;
+  const modifiedLabel =
+    !partial?.modifiedLabel || partial.modifiedLabel === 'Modified'
+      ? DEFAULT_MODIFIED_LABEL
+      : partial.modifiedLabel;
 
   return {
     id: partial?.id ?? crypto.randomUUID(),
     title: normalizeTabTitle(partial?.title ?? DEFAULT_TAB_TITLE),
     titleCustomized,
+    originalLabel: normalizePaneLabel(
+      originalLabel,
+      DEFAULT_ORIGINAL_LABEL,
+    ),
+    modifiedLabel: normalizePaneLabel(
+      modifiedLabel,
+      DEFAULT_MODIFIED_LABEL,
+    ),
     original,
     modified,
     phase,

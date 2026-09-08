@@ -9,6 +9,7 @@ import { ToastContainer } from '../Toast/ToastContainer';
 import { useComparisonTabs } from '../../hooks/useComparisonTabs';
 import { useLocationPaneVisibility } from '../../hooks/useLocationPaneVisibility';
 import { useMultipleTabsEnabled } from '../../hooks/useMultipleTabsEnabled';
+import { useAutoFormatEnabled } from '../../hooks/useAutoFormatEnabled';
 import { useShortcutButtonsVisibility } from '../../hooks/useShortcutButtonsVisibility';
 import {
   KEYBOARD_SHORTCUTS,
@@ -32,6 +33,8 @@ export function AppShell() {
   const { theme, toggleTheme, setTheme } = useTheme();
   const { enabled: multipleTabsEnabled, setEnabled: setMultipleTabsEnabled } =
     useMultipleTabsEnabled();
+  const { enabled: autoFormatEnabled, setEnabled: setAutoFormatEnabled } =
+    useAutoFormatEnabled();
   const comparisonTabs = useComparisonTabs(multipleTabsEnabled);
   const { visible: locationPaneVisible, setVisible: setLocationPaneVisible } =
     useLocationPaneVisibility();
@@ -171,6 +174,7 @@ export function AppShell() {
             locationPaneVisible={locationPaneVisible}
             hideLocationPane={() => setLocationPaneVisible(false)}
             shortcutButtonsVisible={shortcutButtonsVisible}
+            autoFormatEnabled={autoFormatEnabled}
             onOpenSettings={openSettings}
             onToggleTheme={toggleTheme}
             onPersistTab={handlePersistTab}
@@ -204,6 +208,7 @@ export function AppShell() {
             locationPaneVisible={locationPaneVisible}
             hideLocationPane={() => setLocationPaneVisible(false)}
             shortcutButtonsVisible={shortcutButtonsVisible}
+            autoFormatEnabled={autoFormatEnabled}
             onOpenSettings={openSettings}
             onToggleTheme={toggleTheme}
             onPersistTab={(tab) => {
@@ -219,14 +224,15 @@ export function AppShell() {
         locationPaneVisible={locationPaneVisible}
         shortcutButtonsVisible={shortcutButtonsVisible}
         multipleTabsEnabled={multipleTabsEnabled}
+        autoFormatEnabled={autoFormatEnabled}
         onClose={closeSettings}
-        onSwap={() => getActiveWorkspace()?.swap()}
         onWordWrapChange={(enabled) =>
           activeWorkspace?.updateSettings({ wordWrap: enabled ? 'on' : 'off' })
         }
         onLocationPaneVisibleChange={setLocationPaneVisible}
         onShortcutButtonsVisibleChange={setShortcutButtonsVisible}
         onMultipleTabsEnabledChange={handleMultipleTabsChange}
+        onAutoFormatEnabledChange={setAutoFormatEnabled}
       />
 
       <ToastContainer />

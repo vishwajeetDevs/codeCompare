@@ -31,7 +31,11 @@ import {
 } from '../utils/comparisonStorage';
 import type { ThemeMode } from '../types';
 import type { ComparisonTabState } from '../types/comparisonTab';
-import { DEFAULT_TAB_TITLE } from '../types/comparisonTab';
+import {
+  DEFAULT_MODIFIED_LABEL,
+  DEFAULT_ORIGINAL_LABEL,
+  DEFAULT_TAB_TITLE,
+} from '../types/comparisonTab';
 import { useToast } from './useToast';
 
 const LARGE_FILE_LINE_THRESHOLD = 5000;
@@ -113,7 +117,10 @@ export function useComparison(
     loadSharedFromUrl ? needsAsyncShareLoad() : false,
   );
   const [settings, setSettings] = useState(
-    initialTabState?.settings ?? DEFAULT_EDITOR_SETTINGS,
+    {
+      ...(initialTabState?.settings ?? DEFAULT_EDITOR_SETTINGS),
+      language: 'auto' as const,
+    },
   );
   const updateSettings = useCallback((partial: Partial<typeof settings>) => {
     setSettings((current) => ({ ...current, ...partial }));
@@ -134,7 +141,6 @@ export function useComparison(
       }
 
       updateSettings({
-        ...(shared.language !== undefined && { language: shared.language }),
         ...(shared.tabSize !== undefined && { tabSize: shared.tabSize }),
         ...(shared.insertSpaces !== undefined && {
           insertSpaces: shared.insertSpaces,
@@ -162,7 +168,6 @@ export function useComparison(
       if (!shared) return;
 
       updateSettings({
-        ...(shared.language !== undefined && { language: shared.language }),
         ...(shared.tabSize !== undefined && { tabSize: shared.tabSize }),
         ...(shared.insertSpaces !== undefined && {
           insertSpaces: shared.insertSpaces,
@@ -427,7 +432,7 @@ export function useComparison(
   const download = useCallback(
     (kind: DownloadKind) => {
       const language = resolveEditorLanguage(
-        settings.language,
+        'auto',
         original,
         modified,
       );
@@ -461,7 +466,7 @@ export function useComparison(
         showToast('Download failed', 'error');
       }
     },
-    [original, modified, settings.language, reportText, showToast],
+    [original, modified, reportText, showToast],
   );
 
   const captureTabState = useCallback(
@@ -471,10 +476,14 @@ export function useComparison(
       splitRatio: number;
       title?: string;
       titleCustomized?: boolean;
+      originalLabel?: string;
+      modifiedLabel?: string;
     }): ComparisonTabState => ({
       id: tabId,
       title: extras.title ?? DEFAULT_TAB_TITLE,
       titleCustomized: extras.titleCustomized ?? false,
+      originalLabel: extras.originalLabel ?? DEFAULT_ORIGINAL_LABEL,
+      modifiedLabel: extras.modifiedLabel ?? DEFAULT_MODIFIED_LABEL,
       original,
       modified,
       phase,

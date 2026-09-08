@@ -63,6 +63,7 @@ interface ComparisonWorkspaceProps {
   locationPaneVisible: boolean;
   hideLocationPane: () => void;
   shortcutButtonsVisible: boolean;
+  autoFormatEnabled: boolean;
   onOpenSettings: () => void;
   onToggleTheme: () => void;
   onPersistTab: (tab: ComparisonTabState) => void;
@@ -83,6 +84,7 @@ export const ComparisonWorkspace = forwardRef<
     locationPaneVisible,
     hideLocationPane,
     shortcutButtonsVisible,
+    autoFormatEnabled,
     onOpenSettings,
     onToggleTheme,
     onPersistTab,
@@ -106,6 +108,8 @@ export const ComparisonWorkspace = forwardRef<
 
   const isMobile = useIsMobile();
   const [splitRatio, setSplitRatioState] = useState(tabState.splitRatio);
+  const [originalLabel, setOriginalLabel] = useState(tabState.originalLabel);
+  const [modifiedLabel, setModifiedLabel] = useState(tabState.modifiedLabel);
   const [mobileView, setMobileView] = useState<MobileEditorView>('diff');
   const [scrollMetrics, setScrollMetrics] = useState<EditorScrollMetrics | null>(
     null,
@@ -133,6 +137,8 @@ export const ComparisonWorkspace = forwardRef<
       splitRatio,
       title: tabState.title,
       titleCustomized: tabState.titleCustomized,
+      originalLabel,
+      modifiedLabel,
     });
   }, [
     changeNav.activeIndex,
@@ -142,6 +148,8 @@ export const ComparisonWorkspace = forwardRef<
     tabState.scrollRatio,
     tabState.title,
     tabState.titleCustomized,
+    originalLabel,
+    modifiedLabel,
   ]);
 
   const persistLatestRef = useRef(buildPersistedTab);
@@ -166,6 +174,8 @@ export const ComparisonWorkspace = forwardRef<
     comparison.settings,
     changeNav.activeIndex,
     splitRatio,
+    originalLabel,
+    modifiedLabel,
   ]);
 
   useEffect(() => {
@@ -272,7 +282,6 @@ export const ComparisonWorkspace = forwardRef<
   return (
     <div className={isActive ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
       <Toolbar
-        settings={comparison.settings}
         theme={theme}
         splitRatio={splitRatio}
         changeIndex={
@@ -281,7 +290,7 @@ export const ComparisonWorkspace = forwardRef<
         totalChanges={
           comparison.showAlignedComparison ? changeNav.totalChanges : 0
         }
-        onSettingsChange={comparison.updateSettings}
+        onSwap={comparison.swap}
         onToggleTheme={onToggleTheme}
         onOpenSettings={onOpenSettings}
         onClear={comparison.clear}
@@ -337,10 +346,21 @@ export const ComparisonWorkspace = forwardRef<
         />
       )}
 
-      <DesktopPaneLabels splitRatio={splitRatio} />
+      <DesktopPaneLabels
+        splitRatio={splitRatio}
+        originalLabel={originalLabel}
+        modifiedLabel={modifiedLabel}
+        onOriginalLabelChange={setOriginalLabel}
+        onModifiedLabelChange={setModifiedLabel}
+      />
 
       {isMobile && (
-        <MobileEditorTabs active={mobileView} onChange={setMobileView} />
+        <MobileEditorTabs
+          active={mobileView}
+          onChange={setMobileView}
+          originalLabel={originalLabel}
+          modifiedLabel={modifiedLabel}
+        />
       )}
 
       <main className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -367,6 +387,7 @@ export const ComparisonWorkspace = forwardRef<
             onSplitRatioChange={setSplitRatio}
             onScrollMetrics={setScrollMetrics}
             onToggleWordWrap={toggleWordWrap}
+            autoFormatEnabled={autoFormatEnabled}
           />
           <CompareActionBar
             visible={comparison.showCompareBar}

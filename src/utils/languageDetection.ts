@@ -23,7 +23,13 @@ function looksLikeYaml(code: string): boolean {
 }
 
 function looksLikeHtml(code: string): boolean {
-  return /<!DOCTYPE\s+html/i.test(code) || /<html[\s>]/i.test(code);
+  return (
+    /<!DOCTYPE\s+html/i.test(code) ||
+    /<html[\s>]/i.test(code) ||
+    /<(?:div|span|main|section|article|header|footer|nav|button|input|form|script|style|body|head)(?:\s[^>]*)?>/i.test(
+      code,
+    )
+  );
 }
 
 function looksLikeXml(code: string): boolean {
@@ -31,7 +37,18 @@ function looksLikeXml(code: string): boolean {
 }
 
 function looksLikeCss(code: string): boolean {
-  return /[{][^}]*[:][^}]+[}]/.test(code) && !code.includes('function');
+  if (
+    /\b(const|let|function|class|interface|type)\b|=>|console\./.test(code)
+  ) {
+    return false;
+  }
+
+  return (
+    /@(?:media|supports|keyframes|font-face)\b/i.test(code) ||
+    /(?:^|})\s*(?:[.#][\w-]+|[a-z][\w-]*(?:\s+[.#a-z][\w-]*)?|[*])(?:\s*:[\w()-]+)?\s*\{[^}]*[-\w]+\s*:[^;}]+[;}]/im.test(
+      code,
+    )
+  );
 }
 
 function looksLikeSql(code: string): boolean {

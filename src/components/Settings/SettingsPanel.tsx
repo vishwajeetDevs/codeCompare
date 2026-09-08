@@ -6,12 +6,13 @@ interface SettingsPanelProps {
   locationPaneVisible: boolean;
   shortcutButtonsVisible: boolean;
   multipleTabsEnabled: boolean;
+  autoFormatEnabled: boolean;
   onClose: () => void;
-  onSwap: () => void;
   onWordWrapChange: (enabled: boolean) => void;
   onLocationPaneVisibleChange: (visible: boolean) => void;
   onShortcutButtonsVisibleChange: (visible: boolean) => void;
   onMultipleTabsEnabledChange: (enabled: boolean) => void;
+  onAutoFormatEnabledChange: (enabled: boolean) => void;
 }
 
 export function SettingsPanel({
@@ -20,12 +21,13 @@ export function SettingsPanel({
   locationPaneVisible,
   shortcutButtonsVisible,
   multipleTabsEnabled,
+  autoFormatEnabled,
   onClose,
-  onSwap,
   onWordWrapChange,
   onLocationPaneVisibleChange,
   onShortcutButtonsVisibleChange,
   onMultipleTabsEnabledChange,
+  onAutoFormatEnabledChange,
 }: SettingsPanelProps) {
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(open);
@@ -97,22 +99,31 @@ export function SettingsPanel({
               />
               Word wrap (Alt+Z)
             </label>
-            <button
-              type="button"
-              className="btn-secondary flex w-full items-center justify-between !py-2"
-              onClick={onSwap}
-            >
-              <span>Swap panes</span>
-              <span className="text-xs font-normal text-[var(--text-muted)]">
-                Ctrl+Shift+S
-              </span>
-            </button>
           </section>
 
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
               Application
             </h3>
+            <div className="space-y-2">
+              <h4 className="font-medium text-[var(--text-primary)]">
+                Code Formatting
+              </h4>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoFormatEnabled}
+                  onChange={(event) =>
+                    onAutoFormatEnabledChange(event.target.checked)
+                  }
+                />
+                Auto Detect &amp; Format Code
+              </label>
+              <p className="text-xs text-[var(--text-muted)]">
+                Detects each pane independently and formats valid code after
+                editing pauses.
+              </p>
+            </div>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"

@@ -25,6 +25,35 @@ function linesEquivalent(a: string, b: string): boolean {
   return isBlankLine(a) && isBlankLine(b);
 }
 
+/**
+ * Identify structured property lines independently of their values.
+ * This lets JSON/YAML/object fields stay aligned when a value changes or when
+ * adding the next field causes the previous line to gain a trailing comma.
+ */
+function structuredLineKey(line: string): string | null {
+  const property = line.match(
+    /^(\s*)(?:"([^"]+)"|'([^']+)'|([\w.-]+))\s*:/,
+  );
+  if (property) {
+    const indentation = property[1]?.length ?? 0;
+    const key = property[2] ?? property[3] ?? property[4];
+    return `property:${indentation}:${key}`;
+  }
+
+  const trimmed = line.trim();
+  if (/^[}\]],?$/.test(trimmed)) {
+    return `delimiter:${trimmed.replace(/,$/, '')}`;
+  }
+
+  return null;
+}
+
+function linesAlignable(a: string, b: string): boolean {
+  if (linesEquivalent(a, b)) return true;
+  const aKey = structuredLineKey(a);
+  return aKey !== null && aKey === structuredLineKey(b);
+}
+
 function toSegments(original: string, modified: string): Segment[] {
   return diffLines(original, modified).map((change) => ({
     type: change.added ? 'added' : change.removed ? 'removed' : 'unchanged',
@@ -39,7 +68,7 @@ function lcsAlign(removed: string[], added: string[]): AlignOp[] {
 
   for (let i = 1; i <= m; i += 1) {
     for (let j = 1; j <= n; j += 1) {
-      if (linesEquivalent(removed[i - 1]!, added[j - 1]!)) {
+      if (linesAlignable(removed[i - 1]!, added[j - 1]!)) {
         dp[i][j] = dp[i - 1][j - 1] + 1;
       } else {
         dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
@@ -52,8 +81,14 @@ function lcsAlign(removed: string[], added: string[]): AlignOp[] {
   let j = n;
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && linesEquivalent(removed[i - 1]!, added[j - 1]!)) {
-      stack.push({ type: 'unchanged', content: removed[i - 1]! });
+    if (i > 0 && j > 0 && linesAlignable(removed[i - 1]!, added[j - 1]!)) {
+      const original = removed[i - 1]!;
+      const modified = added[j - 1]!;
+      if (linesEquivalent(original, modified)) {
+        stack.push({ type: 'unchanged', content: original });
+      } else {
+        stack.push({ type: 'modified', original, modified });
+      }
       i -= 1;
       j -= 1;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {

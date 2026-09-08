@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import type { editor } from 'monaco-editor';
 import { alignedEditorsToRaw, buildAlignedView, stripTrailingBlankLines } from '../../diff/alignTexts';
@@ -30,8 +31,8 @@ import {
   setupMonaco,
 } from '../../utils/editorConfig';
 import { setupEditorSearch, setupEditorWordWrapShortcut, closeFindWidget } from '../../utils/editorSearch';
-import { setupEditorJsonPaste } from '../../utils/editorJsonPaste';
-import { formatJson, needsJsonFormatting } from '../../utils/jsonFormat';
+import { formatDetectedCode, preloadFormatters } from '../../utils/codeFormatter';
+import { PaneFormatLoadingBar } from '../Layout/Layout';
 import { setupEditorCopy } from '../../utils/editorCopy';
 import { setupChangeContextMenu } from '../../utils/editorChangeActions';
 import { ResizableSplitPane } from '../Layout/ResizableSplitPane';
@@ -58,6 +59,7 @@ interface DiffEditorProps {
   onScrollMetrics?: (metrics: EditorScrollMetrics) => void;
   onToggleWordWrap?: () => void;
   instanceId?: string;
+  autoFormatEnabled?: boolean;
 }
 
 export interface CompareEditorHandle {
@@ -81,8 +83,21 @@ function applyModelSettings(
   });
 }
 
-async function formatEditor(codeEditor: editor.IStandaloneCodeEditor) {
-  await codeEditor.getAction('editor.action.formatDocument')?.run();
+type FormatPane = 'original' | 'modified';
+
+function EditorPaneShell({
+  loading,
+  children,
+}: {
+  loading: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="editor-pane relative h-full min-h-0">
+      {loading && <PaneFormatLoadingBar />}
+      {children}
+    </div>
+  );
 }
 
 function syncEditorValue(
@@ -133,6 +148,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       onScrollMetrics,
       onToggleWordWrap,
       instanceId = 'default',
+      autoFormatEnabled = false,
     },
     ref,
   ) {
@@ -162,8 +178,21 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     const searchDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const changeActionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const wordWrapDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
-    const jsonPasteDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const pasteFormatDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const blockMovePositionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const paneFormatTimersRef = useRef<Record<FormatPane, number | null>>({
+      original: null,
+      modified: null,
+    });
+    const paneFormatRunRef = useRef<Record<FormatPane, number>>({
+      original: 0,
+      modified: 0,
+    });
+    const autoFormatEnabledRef = useRef(autoFormatEnabled);
+    autoFormatEnabledRef.current = autoFormatEnabled;
+    const [formattingPane, setFormattingPane] = useState<
+      Record<FormatPane, boolean>
+    >({ original: false, modified: false });
     const onToggleWordWrapRef = useRef(onToggleWordWrap);
     onToggleWordWrapRef.current = onToggleWordWrap;
 
@@ -275,13 +304,108 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       shouldAlignRef.current && !showOriginalOnly && !showModifiedOnly;
 
     const resolvedLanguage = useMemo(
-      () => resolveEditorLanguage(settings.language, original, modified),
-      [settings.language, original, modified],
+      () => resolveEditorLanguage('auto', original, modified),
+      [original, modified],
     );
 
     const markEditorDrivenUpdate = () => {
       skipExternalSyncRef.current = true;
     };
+
+    const setPaneFormatting = useCallback((pane: FormatPane, loading: boolean) => {
+      setFormattingPane((current) =>
+        current[pane] === loading ? current : { ...current, [pane]: loading },
+      );
+    }, []);
+
+    const cancelPaneFormatSchedule = useCallback((pane: FormatPane) => {
+      const timer = paneFormatTimersRef.current[pane];
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        paneFormatTimersRef.current[pane] = null;
+      }
+    }, []);
+
+    const invalidatePaneFormat = useCallback(
+      (pane: FormatPane) => {
+        cancelPaneFormatSchedule(pane);
+        paneFormatRunRef.current[pane] += 1;
+        setPaneFormatting(pane, false);
+      },
+      [cancelPaneFormatSchedule, setPaneFormatting],
+    );
+
+    const runPaneFormat = useCallback(
+      async (pane: FormatPane, sourceBefore: string, runId: number) => {
+        setPaneFormatting(pane, true);
+        try {
+          const { code } = await formatDetectedCode(sourceBefore, settings);
+          if (runId !== paneFormatRunRef.current[pane]) return;
+
+          const codeEditor =
+            pane === 'original' ? originalRef.current : modifiedRef.current;
+          if (!codeEditor || codeEditor.getValue() !== sourceBefore) return;
+          if (code === sourceBefore) return;
+
+          isSyncingRef.current = true;
+          try {
+            syncEditorValue(codeEditor, code, isSyncingRef);
+          } finally {
+            isSyncingRef.current = false;
+          }
+
+          markEditorDrivenUpdate();
+          if (pane === 'original') onOriginalChange?.(code);
+          else onModifiedChange?.(code);
+        } finally {
+          if (runId === paneFormatRunRef.current[pane]) {
+            setPaneFormatting(pane, false);
+          }
+        }
+      },
+      [onModifiedChange, onOriginalChange, setPaneFormatting, settings],
+    );
+
+    const schedulePaneFormat = useCallback(
+      (pane: FormatPane, content: string, debounceMs = 350) => {
+        cancelPaneFormatSchedule(pane);
+
+        if (!content.trim()) {
+          setPaneFormatting(pane, false);
+          return;
+        }
+
+        paneFormatRunRef.current[pane] += 1;
+        const runId = paneFormatRunRef.current[pane];
+        setPaneFormatting(pane, true);
+
+        paneFormatTimersRef.current[pane] = window.setTimeout(() => {
+          paneFormatTimersRef.current[pane] = null;
+          void runPaneFormat(pane, content, runId);
+        }, debounceMs);
+      },
+      [cancelPaneFormatSchedule, runPaneFormat, setPaneFormatting],
+    );
+
+    const setupPanePasteFormat = useCallback(
+      (codeEditor: editor.IStandaloneCodeEditor, pane: FormatPane) => {
+        const domNode = codeEditor.getDomNode();
+        if (!domNode) return { dispose: () => undefined };
+
+        const onPaste = () => {
+          if (!autoFormatEnabledRef.current || shouldAlignRef.current) return;
+          queueMicrotask(() => {
+            schedulePaneFormat(pane, codeEditor.getValue(), 80);
+          });
+        };
+
+        domNode.addEventListener('paste', onPaste, true);
+        return {
+          dispose: () => domNode.removeEventListener('paste', onPaste, true),
+        };
+      },
+      [schedulePaneFormat],
+    );
 
     const rawFromAligned = (
       alignedOriginal: string,
@@ -363,13 +487,23 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         const orig = originalRef.current;
         const mod = modifiedRef.current;
         if (!orig || !mod) return;
-        await formatEditor(orig);
-        await formatEditor(mod);
-        if (shouldAlignRef.current) {
-          publishRawFromAligned(orig.getValue(), mod.getValue());
-        } else {
-          onOriginalChange?.(orig.getValue());
-          onModifiedChange?.(mod.getValue());
+        const before = getRawContentsFromEditors();
+        setPaneFormatting('original', true);
+        setPaneFormatting('modified', true);
+        try {
+          const [nextOriginal, nextModified] = await Promise.all([
+            formatDetectedCode(before.original, settings),
+            formatDetectedCode(before.modified, settings),
+          ]);
+
+          syncEditorValue(orig, nextOriginal.code, isSyncingRef);
+          syncEditorValue(mod, nextModified.code, isSyncingRef);
+          markEditorDrivenUpdate();
+          onOriginalChange?.(nextOriginal.code);
+          onModifiedChange?.(nextModified.code);
+        } finally {
+          setPaneFormatting('original', false);
+          setPaneFormatting('modified', false);
         }
       },
       clearBoth: () => {
@@ -590,43 +724,6 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       }
     };
 
-    const maybeFormatBothPanesIfJson = () => {
-      const orig = originalRef.current;
-      const mod = modifiedRef.current;
-      if (!orig || !mod || isSyncingRef.current) return;
-
-      const origValue = orig.getValue();
-      const modValue = mod.getValue();
-      const nextOrig = needsJsonFormatting(origValue)
-        ? formatJson(origValue) ?? origValue
-        : origValue;
-      const nextMod = needsJsonFormatting(modValue)
-        ? formatJson(modValue) ?? modValue
-        : modValue;
-
-      if (nextOrig === origValue && nextMod === modValue) return;
-
-      isSyncingRef.current = true;
-      try {
-        if (nextOrig !== origValue) orig.setValue(nextOrig);
-        if (nextMod !== modValue) mod.setValue(nextMod);
-      } finally {
-        isSyncingRef.current = false;
-      }
-
-      if (shouldAlignRef.current) {
-        publishRawFromAligned(orig.getValue(), mod.getValue());
-      } else {
-        markEditorDrivenUpdate();
-        if (nextOrig !== origValue) {
-          onOriginalChange?.(stripTrailingBlankLines(nextOrig));
-        }
-        if (nextMod !== modValue) {
-          onModifiedChange?.(stripTrailingBlankLines(nextMod));
-        }
-      }
-    };
-
     const mountOriginal = (instance: editor.IStandaloneCodeEditor) => {
       originalRef.current = instance;
       applyModelSettings(instance, settings);
@@ -663,10 +760,8 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
             }),
           );
         }
-        jsonPasteDisposablesRef.current.push(
-          setupEditorJsonPaste(instance, {
-            onAfterJsonPaste: maybeFormatBothPanesIfJson,
-          }),
+        pasteFormatDisposablesRef.current.push(
+          setupPanePasteFormat(instance, 'original'),
         );
       }
       instance.onDidChangeModelContent(() => {
@@ -727,10 +822,8 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
             }),
           );
         }
-        jsonPasteDisposablesRef.current.push(
-          setupEditorJsonPaste(instance, {
-            onAfterJsonPaste: maybeFormatBothPanesIfJson,
-          }),
+        pasteFormatDisposablesRef.current.push(
+          setupPanePasteFormat(instance, 'modified'),
         );
       }
       instance.onDidChangeModelContent(() => {
@@ -770,8 +863,10 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           disposable.dispose(),
         );
         changeActionDisposablesRef.current = [];
-        jsonPasteDisposablesRef.current.forEach((disposable) => disposable.dispose());
-        jsonPasteDisposablesRef.current = [];
+        pasteFormatDisposablesRef.current.forEach((disposable) =>
+          disposable.dispose(),
+        );
+        pasteFormatDisposablesRef.current = [];
       };
     }, []);
 
@@ -784,6 +879,50 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       applyModelSettings(orig, settings);
       applyModelSettings(mod, settings);
     }, [settings]);
+
+    useEffect(() => {
+      if (!autoFormatEnabled) {
+        invalidatePaneFormat('original');
+        invalidatePaneFormat('modified');
+        return;
+      }
+
+      preloadFormatters();
+    }, [autoFormatEnabled, invalidatePaneFormat]);
+
+    useEffect(() => {
+      if (!autoFormatEnabled || shouldAlign || !original.trim()) {
+        invalidatePaneFormat('original');
+        return;
+      }
+
+      schedulePaneFormat('original', original);
+      return () => invalidatePaneFormat('original');
+    }, [
+      autoFormatEnabled,
+      invalidatePaneFormat,
+      original,
+      schedulePaneFormat,
+      shouldAlign,
+      settings,
+    ]);
+
+    useEffect(() => {
+      if (!autoFormatEnabled || shouldAlign || !modified.trim()) {
+        invalidatePaneFormat('modified');
+        return;
+      }
+
+      schedulePaneFormat('modified', modified);
+      return () => invalidatePaneFormat('modified');
+    }, [
+      autoFormatEnabled,
+      invalidatePaneFormat,
+      modified,
+      schedulePaneFormat,
+      shouldAlign,
+      settings,
+    ]);
 
     useEffect(() => {
       const monaco = monacoRef.current;
@@ -954,7 +1093,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
 
     if (showOriginalOnly) {
       return (
-        <div className="editor-pane relative h-full min-h-0">
+        <EditorPaneShell loading={formattingPane.original}>
           <Editor
           height="100%"
           language={resolvedLanguage}
@@ -965,13 +1104,13 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           options={createEditorOptions(settings)}
           path={`${instanceId}-original`}
         />
-        </div>
+        </EditorPaneShell>
       );
     }
 
     if (showModifiedOnly) {
       return (
-        <div className="editor-pane relative h-full min-h-0">
+        <EditorPaneShell loading={formattingPane.modified}>
           <Editor
           height="100%"
           language={resolvedLanguage}
@@ -982,14 +1121,15 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           options={createEditorOptions(settings)}
           path={`${instanceId}-modified`}
         />
-        </div>
+        </EditorPaneShell>
       );
     }
 
     if (isMobile) {
       return (
         <div className="grid h-full grid-cols-1">
-          <div className="editor-pane relative h-full min-h-0 border-b border-[var(--border)]">
+          <div className="border-b border-[var(--border)]">
+            <EditorPaneShell loading={formattingPane.original}>
             <Editor
               height="100%"
               language={resolvedLanguage}
@@ -1000,8 +1140,9 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               options={createEditorOptions(settings)}
               path={`${instanceId}-original`}
             />
+            </EditorPaneShell>
           </div>
-          <div className="editor-pane relative h-full min-h-0">
+          <EditorPaneShell loading={formattingPane.modified}>
             <Editor
               height="100%"
               language={resolvedLanguage}
@@ -1012,7 +1153,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               options={createEditorOptions(settings)}
               path={`${instanceId}-modified`}
             />
-          </div>
+          </EditorPaneShell>
         </div>
       );
     }
@@ -1025,7 +1166,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         onMoveBlockLeft={(groupIndex) => applyBlockMove(groupIndex, 'left')}
         onMoveBlockRight={(groupIndex) => applyBlockMove(groupIndex, 'right')}
         left={
-          <div className="editor-pane relative h-full min-h-0">
+          <EditorPaneShell loading={formattingPane.original}>
             <Editor
               height="100%"
               language={resolvedLanguage}
@@ -1036,10 +1177,10 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               options={createEditorOptions(settings)}
               path={`${instanceId}-original`}
             />
-          </div>
+          </EditorPaneShell>
         }
         right={
-          <div className="editor-pane relative h-full min-h-0">
+          <EditorPaneShell loading={formattingPane.modified}>
             <Editor
               height="100%"
               language={resolvedLanguage}
@@ -1050,7 +1191,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               options={createEditorOptions(settings)}
               path={`${instanceId}-modified`}
             />
-          </div>
+          </EditorPaneShell>
         }
       />
     );

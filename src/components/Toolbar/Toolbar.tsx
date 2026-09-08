@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import { MONACO_LANGUAGES, type EditorSettings } from '../../types/editor';
 import type { ThemeMode } from '../../types';
 import type { ShareLinkResult } from '../../types/share';
 import { ShareIcon, SharePopover } from '../ShareDialog/SharePopover';
@@ -8,12 +7,11 @@ import { ChangeNavControls } from './ChangeNavBar';
 import { SPLIT_DIVIDER_WIDTH_PX } from '../Layout/ResizableSplitPane';
 
 interface ToolbarProps {
-  settings: EditorSettings;
   theme: ThemeMode;
   splitRatio: number;
   changeIndex: number;
   totalChanges: number;
-  onSettingsChange: (partial: Partial<EditorSettings>) => void;
+  onSwap: () => void;
   onToggleTheme: () => void;
   onOpenSettings: () => void;
   onClear: () => void;
@@ -30,9 +28,6 @@ const iconBtnClass =
 
 const iconBtnActiveClass =
   'border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--accent)]';
-
-const selectClass =
-  'cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface-1)] px-2 py-1.5 text-sm text-[var(--text-secondary)] outline-none focus:border-[var(--accent)]';
 
 function SunIcon() {
   return (
@@ -93,13 +88,26 @@ function TrashIcon() {
   );
 }
 
+function SwapIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M7 7h12m0 0-3-3m3 3-3 3M17 17H5m0 0 3 3m-3-3 3-3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function Toolbar({
-  settings,
   theme,
   splitRatio,
   changeIndex,
   totalChanges,
-  onSettingsChange,
+  onSwap,
   onToggleTheme,
   onOpenSettings,
   onClear,
@@ -184,23 +192,15 @@ export function Toolbar({
       )}
 
       <div className="relative z-10 ml-auto flex flex-wrap items-center justify-end gap-2">
-        <select
-          value={settings.language}
-          onChange={(event) =>
-            onSettingsChange({
-              language: event.target.value as EditorSettings['language'],
-            })
-          }
-          className={selectClass}
-          aria-label="Language"
+        <button
+          type="button"
+          onClick={onSwap}
+          className={iconBtnClass}
+          aria-label="Swap panes"
+          title="Swap panes (Ctrl+Shift+S)"
         >
-          <option value="auto">Auto Detect</option>
-          {MONACO_LANGUAGES.map((language) => (
-            <option key={language.id} value={language.id}>
-              {language.label}
-            </option>
-          ))}
-        </select>
+          <SwapIcon />
+        </button>
 
         <button
           type="button"
