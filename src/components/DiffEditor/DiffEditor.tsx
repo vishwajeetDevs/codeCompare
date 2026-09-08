@@ -52,6 +52,7 @@ interface DiffEditorProps {
   isMobile?: boolean;
   onOriginalChange?: (value: string) => void;
   onModifiedChange?: (value: string) => void;
+  onBlockMove?: (original: string, modified: string) => void;
   splitRatio?: number;
   onSplitRatioChange?: (ratio: number) => void;
   onScrollMetrics?: (metrics: EditorScrollMetrics) => void;
@@ -126,6 +127,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       isMobile = false,
       onOriginalChange,
       onModifiedChange,
+      onBlockMove,
       splitRatio = 0.5,
       onSplitRatioChange,
       onScrollMetrics,
@@ -275,7 +277,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       skipExternalSyncRef.current = true;
     };
 
-    const publishRawFromAligned = (
+    const rawFromAligned = (
       alignedOriginal: string,
       alignedModified: string,
     ) => {
@@ -286,9 +288,20 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           ? displayDiffResultRef.current
           : alignedResultRef.current,
       );
+      return {
+        original: stripTrailingBlankLines(raw.original),
+        modified: stripTrailingBlankLines(raw.modified),
+      };
+    };
+
+    const publishRawFromAligned = (
+      alignedOriginal: string,
+      alignedModified: string,
+    ) => {
+      const raw = rawFromAligned(alignedOriginal, alignedModified);
       markEditorDrivenUpdate();
-      onOriginalChange?.(stripTrailingBlankLines(raw.original));
-      onModifiedChange?.(stripTrailingBlankLines(raw.modified));
+      onOriginalChange?.(raw.original);
+      onModifiedChange?.(raw.modified);
     };
 
     const publishScrollMetrics = () => {
@@ -546,7 +559,14 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         isSyncingRef.current = false;
       }
 
-      publishRawFromAligned(next.original, next.modified);
+      const raw = rawFromAligned(next.original, next.modified);
+      markEditorDrivenUpdate();
+      if (onBlockMove) {
+        onBlockMove(raw.original, raw.modified);
+      } else {
+        onOriginalChange?.(raw.original);
+        onModifiedChange?.(raw.modified);
+      }
     };
 
     const maybeFormatBothPanesIfJson = () => {

@@ -362,6 +362,7 @@ export const ComparisonWorkspace = forwardRef<
             mobileView={isMobile ? mobileView : null}
             onOriginalChange={comparison.setOriginal}
             onModifiedChange={comparison.setModified}
+            onBlockMove={comparison.applyBlockMove}
             splitRatio={splitRatio}
             onSplitRatioChange={setSplitRatio}
             onScrollMetrics={setScrollMetrics}

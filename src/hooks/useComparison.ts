@@ -308,6 +308,23 @@ export function useComparison(
 
   const compare = runComparison;
 
+  const applyBlockMove = useCallback(
+    (nextOriginal: string, nextModified: string) => {
+      const normalizedOriginal = stripTrailingBlankLines(nextOriginal);
+      const normalizedModified = stripTrailingBlankLines(nextModified);
+
+      setOriginal(normalizedOriginal);
+      setModified(normalizedModified);
+      setSnapshot({
+        original: normalizedOriginal,
+        modified: normalizedModified,
+      });
+      setCompareVersion((version) => version + 1);
+      setPhase('compared');
+    },
+    [],
+  );
+
   const swap = useCallback(() => {
     const live = editorRef.current?.getRawContents();
     const currentOriginal = live?.original ?? original;
@@ -493,6 +510,7 @@ export function useComparison(
     compareBarMode,
     canRunCompare,
     compare,
+    applyBlockMove,
     swap,
     clear,
     format,
