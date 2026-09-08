@@ -27,8 +27,8 @@ export function ChangeNavControls({
         onClick={onPrevChange}
         className={btnClass}
         disabled={totalChanges === 0}
-        aria-label="Previous change"
-        title="Previous change"
+        aria-label="Previous change block"
+        title="Previous change block"
       >
         ↑
       </button>
@@ -43,8 +43,8 @@ export function ChangeNavControls({
         onClick={onNextChange}
         className={btnClass}
         disabled={totalChanges === 0}
-        aria-label="Next change"
-        title="Next change"
+        aria-label="Next change block"
+        title="Next change block"
       >
         ↓
       </button>

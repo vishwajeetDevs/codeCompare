@@ -17,13 +17,13 @@ export function applyDiffDecorationsToEditors(
   modifiedEditor: editor.IStandaloneCodeEditor,
   alignedResult: LineDiffResult,
   decorationIds: DecorationIds,
-  activeAlignedLine?: number | null,
+  activeChangeBlock?: { start: number; end: number } | null,
   options?: { skipOriginal?: boolean; skipModified?: boolean },
 ): void {
   const decorations = createLineDiffDecorations(
     monaco,
     alignedResult,
-    activeAlignedLine,
+    activeChangeBlock,
   );
 
   decorationIds.original = originalEditor.deltaDecorations(

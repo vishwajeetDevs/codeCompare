@@ -19,6 +19,7 @@ interface ToolbarProps {
   onPrevChange: () => void;
   onNextChange: () => void;
   onCloseFind?: () => void;
+  showShortcutButtons?: boolean;
   onGetShareLink: () => Promise<ShareLinkResult>;
   onCopyShareLink: (link?: ShareLinkResult) => Promise<boolean>;
 }
@@ -104,6 +105,7 @@ export function Toolbar({
   onPrevChange,
   onNextChange,
   onCloseFind,
+  showShortcutButtons = true,
   onGetShareLink,
   onCopyShareLink,
 }: ToolbarProps) {
@@ -150,19 +152,21 @@ export function Toolbar({
         </h1>
       </div>
 
-      <div
-        className="pointer-events-none absolute top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:flex md:items-center md:gap-1.5"
-        style={{ left: dividerCenter }}
-      >
-        <div className="pointer-events-auto flex items-center gap-1.5">
-          <ChangeNavControls
-            changeIndex={changeIndex}
-            totalChanges={totalChanges}
-            onPrevChange={handlePrevChange}
-            onNextChange={handleNextChange}
-          />
+      {showShortcutButtons && (
+        <div
+          className="pointer-events-none absolute top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:flex md:items-center md:gap-1.5"
+          style={{ left: dividerCenter }}
+        >
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            <ChangeNavControls
+              changeIndex={changeIndex}
+              totalChanges={totalChanges}
+              onPrevChange={handlePrevChange}
+              onNextChange={handleNextChange}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="relative z-10 ml-auto flex flex-wrap items-center justify-end gap-2">
         <select

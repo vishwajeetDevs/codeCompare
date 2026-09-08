@@ -97,10 +97,11 @@ function modifiedLineDecorations(
 
 function activeChangeDecoration(
   monaco: Monaco,
-  lineNumber: number,
+  startLine: number,
+  endLine: number,
 ): editor.IModelDeltaDecoration {
   return {
-    range: new monaco.Range(lineNumber, 1, lineNumber, Number.MAX_SAFE_INTEGER),
+    range: new monaco.Range(startLine, 1, endLine, Number.MAX_SAFE_INTEGER),
     options: {
       isWholeLine: true,
       className: 'line-diff-active-change',
@@ -111,7 +112,7 @@ function activeChangeDecoration(
 export function createLineDiffDecorations(
   monaco: Monaco,
   result: LineDiffResult,
-  activeAlignedLine?: number | null,
+  activeChangeBlock?: { start: number; end: number } | null,
 ): {
   original: editor.IModelDeltaDecoration[];
   modified: editor.IModelDeltaDecoration[];
@@ -148,9 +149,21 @@ export function createLineDiffDecorations(
     ...modifiedDecorations.modified,
   ];
 
-  if (activeAlignedLine && activeAlignedLine > 0) {
-    original.push(activeChangeDecoration(monaco, activeAlignedLine));
-    modified.push(activeChangeDecoration(monaco, activeAlignedLine));
+  if (activeChangeBlock && activeChangeBlock.start > 0) {
+    original.push(
+      activeChangeDecoration(
+        monaco,
+        activeChangeBlock.start,
+        activeChangeBlock.end,
+      ),
+    );
+    modified.push(
+      activeChangeDecoration(
+        monaco,
+        activeChangeBlock.start,
+        activeChangeBlock.end,
+      ),
+    );
   }
 
   return { original, modified };

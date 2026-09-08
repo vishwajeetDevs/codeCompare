@@ -45,16 +45,23 @@ export function useChangeNavigation(
     );
   }, [enabled, groups.length]);
 
-  const activeAlignedLine =
-    enabled && activeIndex >= 0
-      ? groups[activeIndex]?.alignedLine ?? null
-      : null;
+  const activeGroup =
+    enabled && activeIndex >= 0 ? groups[activeIndex] : undefined;
+
+  const activeAlignedLine = activeGroup?.alignedLine ?? null;
+  const activeChangeBlock = activeGroup
+    ? {
+        start: activeGroup.alignedLineStart,
+        end: activeGroup.alignedLineEnd,
+      }
+    : null;
 
   return {
     alignedResult,
     groups,
     activeIndex,
     activeAlignedLine,
+    activeChangeBlock,
     totalChanges: enabled ? groups.length : 0,
     goNext,
     goPrev,

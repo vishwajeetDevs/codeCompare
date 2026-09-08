@@ -9,6 +9,13 @@ import {
 } from 'react';
 import type { editor } from 'monaco-editor';
 import { alignedEditorsToRaw, buildAlignedView, stripTrailingBlankLines } from '../../diff/alignTexts';
+import { buildChangeGroups } from '../../diff/changeGroups';
+import {
+  applyMoveBlockToLeft,
+  applyMoveBlockToRight,
+  canMoveBlockToLeft,
+  canMoveBlockToRight,
+} from '../../diff/changeMove';
 import { createEmptyLineDiffResult } from '../../diff/lineDiff';
 import { applyDiffDecorationsToEditors } from '../../hooks/applyDiffDecorations';
 import { getMonacoTheme } from '../../hooks/useTheme';
@@ -35,6 +42,7 @@ interface DiffEditorProps {
   displayDiffResult?: LineDiffResult;
   activeChangeIndex?: number;
   activeChangeAlignedLine?: number | null;
+  activeChangeBlock?: { start: number; end: number } | null;
   mobileView?: MobileEditorView | null;
   isMobile?: boolean;
   onOriginalChange?: (value: string) => void;
@@ -104,6 +112,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       displayDiffResult,
       activeChangeIndex = -1,
       activeChangeAlignedLine = null,
+      activeChangeBlock = null,
       mobileView = null,
       isMobile = false,
       onOriginalChange,
@@ -147,13 +156,32 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     const alignedResultRef = useRef(alignedView.result);
     alignedResultRef.current = alignedView.result;
 
-    const monacoTheme = getMonacoTheme(theme);
     const showOriginalOnly = isMobile && mobileView === 'original';
     const showModifiedOnly = isMobile && mobileView === 'modified';
     const shouldAlign =
       showDiffHighlights &&
       original.trim().length > 0 &&
       modified.trim().length > 0;
+
+    const changeGroups = useMemo(
+      () => (shouldAlign ? buildChangeGroups(alignedView.result) : []),
+      [alignedView.result, shouldAlign],
+    );
+
+    const activeChangeGroup =
+      activeChangeIndex >= 0 ? changeGroups[activeChangeIndex] : undefined;
+
+    const canMoveActiveBlockLeft =
+      shouldAlign &&
+      activeChangeGroup != null &&
+      canMoveBlockToLeft(alignedView.result, activeChangeGroup);
+
+    const canMoveActiveBlockRight =
+      shouldAlign &&
+      activeChangeGroup != null &&
+      canMoveBlockToRight(alignedView.result, activeChangeGroup);
+
+    const monacoTheme = getMonacoTheme(theme);
     const shouldAlignRef = useRef(shouldAlign);
     shouldAlignRef.current = shouldAlign;
     const isAlignedMode = () =>
@@ -321,7 +349,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         mod,
         shouldAlign ? alignedView.result : rawResult,
         decorationIdsRef.current,
-        shouldAlign ? activeChangeAlignedLine : null,
+        shouldAlign ? activeChangeBlock : null,
         shouldAlign
           ? undefined
           : {
@@ -380,13 +408,55 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       publishRawFromAligned(alignedOriginal, alignedModified);
     };
 
+    const applyActiveBlockMove = (direction: 'left' | 'right') => {
+      const orig = originalRef.current;
+      const mod = modifiedRef.current;
+      if (!orig || !mod || !shouldAlignRef.current || activeChangeIndex < 0) {
+        return;
+      }
+
+      const groups = buildChangeGroups(alignedResultRef.current);
+      const group = groups[activeChangeIndex];
+      if (!group) return;
+
+      const result = alignedResultRef.current;
+      const next =
+        direction === 'left'
+          ? applyMoveBlockToLeft(
+              orig.getValue(),
+              mod.getValue(),
+              result,
+              group,
+            )
+          : applyMoveBlockToRight(
+              orig.getValue(),
+              mod.getValue(),
+              result,
+              group,
+            );
+
+      if (!next) return;
+
+      isSyncingRef.current = true;
+      try {
+        orig.setValue(next.original);
+        mod.setValue(next.modified);
+      } finally {
+        isSyncingRef.current = false;
+      }
+
+      publishRawFromAligned(next.original, next.modified);
+    };
+
     const mountOriginal = (instance: editor.IStandaloneCodeEditor) => {
       originalRef.current = instance;
       applyModelSettings(instance, settings);
       applyEditorLanguage(instance);
       if (monacoRef.current) {
         searchDisposablesRef.current.push(
-          setupEditorSearch(instance, monacoRef.current),
+          setupEditorSearch(instance, monacoRef.current, {
+            getSiblingEditor: () => modifiedRef.current,
+          }),
         );
         copyDisposablesRef.current.push(
           setupEditorCopy(
@@ -435,7 +505,9 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       applyEditorLanguage(instance);
       if (monacoRef.current) {
         searchDisposablesRef.current.push(
-          setupEditorSearch(instance, monacoRef.current),
+          setupEditorSearch(instance, monacoRef.current, {
+            getSiblingEditor: () => originalRef.current,
+          }),
         );
         copyDisposablesRef.current.push(
           setupEditorCopy(
@@ -590,7 +662,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
 
     useEffect(() => {
       applyDecorations();
-    }, [alignedView.result, theme, activeChangeAlignedLine, showDiffHighlights]);
+    }, [alignedView.result, theme, activeChangeBlock, showDiffHighlights]);
 
     useEffect(() => {
       const orig = originalRef.current;
@@ -697,6 +769,11 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       <ResizableSplitPane
         ratio={splitRatio}
         onRatioChange={onSplitRatioChange ?? (() => undefined)}
+        showBlockMoveControls={shouldAlign && activeChangeIndex >= 0}
+        canMoveBlockLeft={canMoveActiveBlockLeft}
+        canMoveBlockRight={canMoveActiveBlockRight}
+        onMoveBlockLeft={() => applyActiveBlockMove('left')}
+        onMoveBlockRight={() => applyActiveBlockMove('right')}
         left={
           <div className="editor-pane relative h-full min-h-0">
             <Editor

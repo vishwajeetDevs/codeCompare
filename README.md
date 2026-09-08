@@ -97,14 +97,18 @@ Open `http://localhost:4173` and test a share link at `/c/...`.
 
 Configured in `vercel.json`: SPA rewrites for share routes, asset caching, and security headers.
 
-### Short share links (large comparisons)
+### Share links (Neon PostgreSQL)
 
-For comparisons that would produce a long URL, CodeCompare stores the payload server-side and returns a short link like `/c/ABC12XYZ` (8 characters).
+Every share link is a fixed **8-character** URL like `/c/ABC12XYZ`. Comparison data is stored in Neon PostgreSQL — not embedded in the URL.
 
-1. In the Vercel project dashboard, open **Marketplace** → add **Upstash Redis** (or an existing Redis integration).
-2. Connect it to this project (`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set automatically; legacy `KV_*` vars also work).
-3. Redeploy.
+1. Create a [Neon](https://neon.tech) database and copy the connection string.
+2. Set `DATABASE_URL` in `.env` locally and in the Vercel project environment variables.
+3. Initialize the table:
 
-Links expire after 90 days. If Redis is not configured, large comparisons fall back to a compressed URL hash (longer, but still works without any setup).
+```bash
+npm run db:init
+```
 
-Smaller comparisons still use a self-contained URL with improved compression (patch encoding when one side is similar to the other).
+4. For local API routes (share create/load), run `npx vercel dev` instead of `npm run dev`.
+
+Links expire after 90 days. The API auto-creates the `shares` table on first use if you skip `db:init`.

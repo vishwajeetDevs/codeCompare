@@ -194,6 +194,11 @@ button:disabled {
   isolation: isolate;
 }
 
+/* Keep pane elevated while find widget exists (avoids close-tooltip flicker). */
+.editor-pane:has(.find-widget) {
+  z-index: 2;
+}
+
 .editor-pane:focus-within {
   z-index: 2;
 }
@@ -201,6 +206,15 @@ button:disabled {
 .editor-pane .monaco-editor .find-widget {
   z-index: 40 !important;
   max-width: min(420px, calc(100% - 32px));
+}
+
+/* Hide Monaco hover tooltip on the find widget close (×) button */
+body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
+  display: none !important;
+}
+
+.editor-pane .monaco-editor .find-widget:not(.visible) .button {
+  pointer-events: none;
 }
 
 .editor-pane .monaco-editor .overflowingContentWidgets {
@@ -212,15 +226,65 @@ button:disabled {
 }
 
 .split-divider {
+  position: relative;
+  z-index: 5;
   cursor: col-resize;
   touch-action: none;
   background: var(--border);
   transition: background-color 0.15s ease;
 }
 
+.split-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -10px;
+  right: -10px;
+}
+
 .split-divider:hover,
 .split-divider:active {
   background: var(--accent);
+}
+
+.split-divider-move-controls {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.split-divider-move-btn {
+  display: flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  cursor: default;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.split-divider-move-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.split-divider-move-btn:disabled {
+  cursor: default;
+  opacity: 0.35;
 }
 
 /* Hide minimap and overview ruler overlays */
@@ -302,6 +366,11 @@ button:disabled {
 }
 
 /* Location pane minimap */
+.location-pane,
+.location-pane * {
+  cursor: default !important;
+}
+
 .location-pane {
   user-select: none;
 }
@@ -313,7 +382,6 @@ button:disabled {
 }
 
 .loc-marker {
-  cursor: pointer;
   border-radius: 1px;
   transition: box-shadow 0.12s ease;
 }

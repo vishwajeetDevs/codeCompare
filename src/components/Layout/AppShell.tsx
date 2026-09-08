@@ -15,6 +15,7 @@ import { Toolbar } from '../Toolbar/Toolbar';
 import { MobileChangeNav } from '../Toolbar/ChangeNavBar';
 import { useChangeNavigation } from '../../hooks/useChangeNavigation';
 import { useLocationPaneVisibility } from '../../hooks/useLocationPaneVisibility';
+import { useShortcutButtonsVisibility } from '../../hooks/useShortcutButtonsVisibility';
 import { useComparison } from '../../hooks/useComparison';
 import {
   KEYBOARD_SHORTCUTS,
@@ -36,8 +37,12 @@ export function AppShell() {
   );
   const isMobile = useIsMobile();
   const { splitRatio, setSplitRatio } = useSplitRatio();
-  const { visible: locationPaneVisible, hide: hideLocationPane } =
+  const { visible: locationPaneVisible, setVisible: setLocationPaneVisible, hide: hideLocationPane } =
     useLocationPaneVisibility();
+  const {
+    visible: shortcutButtonsVisible,
+    setVisible: setShortcutButtonsVisible,
+  } = useShortcutButtonsVisibility();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileView, setMobileView] = useState<MobileEditorView>('diff');
   const [scrollMetrics, setScrollMetrics] = useState<EditorScrollMetrics | null>(
@@ -80,18 +85,23 @@ export function AppShell() {
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
+  const closeFindWidgets = useCallback(() => {
+    comparison.editorRef.current?.closeFindWidgets();
+  }, [comparison.editorRef]);
+
   useKeyboardShortcuts({
     onCompare: comparison.compare,
     onSwap: comparison.swap,
     onClear: comparison.clear,
     onShare: comparison.share,
     onToggleSettings: () => setSettingsOpen((open) => !open),
+    onCloseFind: closeFindWidgets,
     onPrevChange: () => {
-      comparison.editorRef.current?.closeFindWidgets();
+      closeFindWidgets();
       changeNav.goPrev();
     },
     onNextChange: () => {
-      comparison.editorRef.current?.closeFindWidgets();
+      closeFindWidgets();
       changeNav.goNext();
     },
   });
@@ -114,7 +124,8 @@ export function AppShell() {
         onClear={comparison.clear}
         onPrevChange={changeNav.goPrev}
         onNextChange={changeNav.goNext}
-        onCloseFind={() => comparison.editorRef.current?.closeFindWidgets()}
+        onCloseFind={closeFindWidgets}
+        showShortcutButtons={shortcutButtonsVisible}
         onGetShareLink={comparison.getShareLink}
         onCopyShareLink={comparison.copyShareLink}
       />
@@ -135,13 +146,15 @@ export function AppShell() {
 
       {comparison.isLargeFile && <LargeFileBanner />}
 
-      <MobileChangeNav
-        changeIndex={comparison.showComparisonResults ? Math.max(changeNav.activeIndex, 0) : 0}
-        totalChanges={comparison.showComparisonResults ? changeNav.totalChanges : 0}
-        onPrevChange={changeNav.goPrev}
-        onNextChange={changeNav.goNext}
-        onCloseFind={() => comparison.editorRef.current?.closeFindWidgets()}
-      />
+      {shortcutButtonsVisible && (
+        <MobileChangeNav
+          changeIndex={comparison.showComparisonResults ? Math.max(changeNav.activeIndex, 0) : 0}
+          totalChanges={comparison.showComparisonResults ? changeNav.totalChanges : 0}
+          onPrevChange={changeNav.goPrev}
+          onNextChange={changeNav.goNext}
+          onCloseFind={closeFindWidgets}
+        />
+      )}
 
       <DesktopPaneLabels splitRatio={splitRatio} />
 
@@ -162,6 +175,7 @@ export function AppShell() {
             displayDiffResult={comparison.diffResult}
             activeChangeIndex={changeNav.activeIndex}
             activeChangeAlignedLine={changeNav.activeAlignedLine}
+            activeChangeBlock={changeNav.activeChangeBlock}
             isMobile={isMobile}
             mobileView={isMobile ? mobileView : null}
             onOriginalChange={comparison.setOriginal}
@@ -195,13 +209,15 @@ export function AppShell() {
 
       <SettingsPanel
         open={settingsOpen}
-        settings={comparison.settings}
+        wordWrap={comparison.settings.wordWrap === 'on'}
+        locationPaneVisible={locationPaneVisible}
+        shortcutButtonsVisible={shortcutButtonsVisible}
         onClose={closeSettings}
-        onSettingsChange={comparison.updateSettings}
-        onShare={comparison.share}
-        onSwap={comparison.swap}
-        onFormat={comparison.format}
-        onDownload={comparison.download}
+        onWordWrapChange={(enabled) =>
+          comparison.updateSettings({ wordWrap: enabled ? 'on' : 'off' })
+        }
+        onLocationPaneVisibleChange={setLocationPaneVisible}
+        onShortcutButtonsVisibleChange={setShortcutButtonsVisible}
       />
 
       <ToastContainer />

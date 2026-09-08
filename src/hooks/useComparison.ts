@@ -307,11 +307,7 @@ export function useComparison(
     try {
       const result = await getShareLink();
       await navigator.clipboard.writeText(result.url);
-      const hint = result.hosted
-        ? ' (short link)'
-        : result.localOnly
-          ? ' (uses URL hash)'
-          : '';
+      const hint = result.hosted ? ' (saved to database)' : '';
       showToast(`Share link copied · ${result.displayId}${hint}`, 'success');
       return result;
     } catch {

@@ -20,26 +20,53 @@ export interface LocationPaneModel {
   modified: LocationMarker[];
 }
 
-function segmentHeight(totalLines: number): number {
-  return Math.max(100 / totalLines, 0.35);
+function blockHeightPercent(
+  startLine: number,
+  endLine: number,
+  totalLines: number,
+): number {
+  const lineCount = endLine - startLine + 1;
+  return Math.max((lineCount / totalLines) * 100, 0.35);
 }
 
-function pushMarker(
+function blockTopPercent(startLine: number, totalLines: number): number {
+  return ((startLine - 1) / totalLines) * 100;
+}
+
+function sideKindForBlock(
+  entries: LineDiffEntry[],
+  startIndex: number,
+  endIndex: number,
+  side: 'original' | 'modified',
+): LocationMarkerKind {
+  for (let index = startIndex; index <= endIndex; index += 1) {
+    const entry = entries[index]!;
+    if (side === 'original') {
+      if (entry.type === 'removed' || entry.type === 'modified') return 'content';
+    } else if (entry.type === 'added' || entry.type === 'modified') {
+      return 'content';
+    }
+  }
+  return 'blank';
+}
+
+function pushBlockMarker(
   target: LocationMarker[],
-  entry: LineDiffEntry,
-  row: number,
-  changeIndex: number,
+  group: ChangeGroup,
   totalLines: number,
   kind: LocationMarkerKind,
 ) {
-  const heightPercent = segmentHeight(totalLines);
   target.push({
-    alignedLine: row,
-    changeIndex,
-    type: entry.type as Exclude<DiffType, 'unchanged'>,
+    alignedLine: group.alignedLineStart,
+    changeIndex: group.index,
+    type: group.type,
     kind,
-    topPercent: ((row - 1) / totalLines) * 100,
-    heightPercent,
+    topPercent: blockTopPercent(group.alignedLineStart, totalLines),
+    heightPercent: blockHeightPercent(
+      group.alignedLineStart,
+      group.alignedLineEnd,
+      totalLines,
+    ),
   });
 }
 
@@ -52,31 +79,22 @@ export function buildLocationPaneModel(
   const original: LocationMarker[] = [];
   const modified: LocationMarker[] = [];
 
-  let changePointer = 0;
+  for (const group of groups) {
+    const startIndex = group.alignedLineStart - 1;
+    const endIndex = group.alignedLineEnd - 1;
 
-  for (let index = 0; index < result.entries.length; index += 1) {
-    const entry = result.entries[index]!;
-    const row = index + 1;
-
-    if (entry.type === 'unchanged') continue;
-
-    const changeIndex = groups[changePointer]?.index ?? changePointer;
-    changePointer += 1;
-
-    if (entry.type === 'added') {
-      pushMarker(original, entry, row, changeIndex, totalLines, 'blank');
-      pushMarker(modified, entry, row, changeIndex, totalLines, 'content');
-      continue;
-    }
-
-    if (entry.type === 'removed') {
-      pushMarker(original, entry, row, changeIndex, totalLines, 'content');
-      pushMarker(modified, entry, row, changeIndex, totalLines, 'blank');
-      continue;
-    }
-
-    pushMarker(original, entry, row, changeIndex, totalLines, 'content');
-    pushMarker(modified, entry, row, changeIndex, totalLines, 'content');
+    pushBlockMarker(
+      original,
+      group,
+      totalLines,
+      sideKindForBlock(result.entries, startIndex, endIndex, 'original'),
+    );
+    pushBlockMarker(
+      modified,
+      group,
+      totalLines,
+      sideKindForBlock(result.entries, startIndex, endIndex, 'modified'),
+    );
   }
 
   return {
@@ -88,6 +106,73 @@ export function buildLocationPaneModel(
   };
 }
 
+function collectRawBlockLines(
+  entries: LineDiffEntry[],
+  startIndex: number,
+  endIndex: number,
+): {
+  originalLines: number[];
+  modifiedLines: number[];
+} {
+  const originalLines: number[] = [];
+  const modifiedLines: number[] = [];
+  let origLine = 0;
+  let modLine = 0;
+
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!;
+
+    if (entry.type === 'unchanged') {
+      origLine += 1;
+      modLine += 1;
+      continue;
+    }
+
+    if (entry.type === 'added') {
+      modLine += 1;
+      if (index >= startIndex && index <= endIndex) modifiedLines.push(modLine);
+      continue;
+    }
+
+    if (entry.type === 'removed') {
+      origLine += 1;
+      if (index >= startIndex && index <= endIndex) originalLines.push(origLine);
+      continue;
+    }
+
+    origLine += 1;
+    modLine += 1;
+    if (index >= startIndex && index <= endIndex) {
+      originalLines.push(origLine);
+      modifiedLines.push(modLine);
+    }
+  }
+
+  return { originalLines, modifiedLines };
+}
+
+function pushRawBlockMarker(
+  target: LocationMarker[],
+  group: ChangeGroup,
+  lines: number[],
+  totalLines: number,
+  kind: LocationMarkerKind,
+) {
+  if (lines.length === 0) return;
+
+  const startLine = Math.min(...lines);
+  const endLine = Math.max(...lines);
+
+  target.push({
+    alignedLine: startLine,
+    changeIndex: group.index,
+    type: group.type,
+    kind,
+    topPercent: blockTopPercent(startLine, totalLines),
+    heightPercent: blockHeightPercent(startLine, endLine, totalLines),
+  });
+}
+
 /** Build minimap markers when editors are not vertically aligned (single-pane or raw view). */
 export function buildLocationPaneModelRaw(
   result: LineDiffResult,
@@ -97,7 +182,6 @@ export function buildLocationPaneModelRaw(
   const modified: LocationMarker[] = [];
   let origLine = 0;
   let modLine = 0;
-  let changePointer = 0;
 
   for (const entry of result.entries) {
     if (entry.type === 'unchanged') {
@@ -106,71 +190,47 @@ export function buildLocationPaneModelRaw(
       continue;
     }
 
-    const changeIndex = groups[changePointer]?.index ?? changePointer;
-    changePointer += 1;
-
     if (entry.type === 'added') {
       modLine += 1;
-      const total = Math.max(modLine, 1);
-      modified.push({
-        alignedLine: modLine,
-        changeIndex,
-        type: 'added',
-        kind: 'content',
-        topPercent: ((modLine - 1) / total) * 100,
-        heightPercent: segmentHeight(total),
-      });
       continue;
     }
 
     if (entry.type === 'removed') {
       origLine += 1;
-      const total = Math.max(origLine, 1);
-      original.push({
-        alignedLine: origLine,
-        changeIndex,
-        type: 'removed',
-        kind: 'content',
-        topPercent: ((origLine - 1) / total) * 100,
-        heightPercent: segmentHeight(total),
-      });
       continue;
     }
 
     origLine += 1;
     modLine += 1;
-    const origTotal = Math.max(origLine, 1);
-    const modTotal = Math.max(modLine, 1);
-    original.push({
-      alignedLine: origLine,
-      changeIndex,
-      type: 'modified',
-      kind: 'content',
-      topPercent: ((origLine - 1) / origTotal) * 100,
-      heightPercent: segmentHeight(origTotal),
-    });
-    modified.push({
-      alignedLine: modLine,
-      changeIndex,
-      type: 'modified',
-      kind: 'content',
-      topPercent: ((modLine - 1) / modTotal) * 100,
-      heightPercent: segmentHeight(modTotal),
-    });
   }
 
   const originalTotalLines = Math.max(origLine, 1);
   const modifiedTotalLines = Math.max(modLine, 1);
   const totalLines = Math.max(originalTotalLines, modifiedTotalLines);
 
-  for (const marker of original) {
-    marker.topPercent = ((marker.alignedLine - 1) / originalTotalLines) * 100;
-    marker.heightPercent = segmentHeight(originalTotalLines);
-  }
+  for (const group of groups) {
+    const startIndex = group.alignedLineStart - 1;
+    const endIndex = group.alignedLineEnd - 1;
+    const { originalLines, modifiedLines } = collectRawBlockLines(
+      result.entries,
+      startIndex,
+      endIndex,
+    );
 
-  for (const marker of modified) {
-    marker.topPercent = ((marker.alignedLine - 1) / modifiedTotalLines) * 100;
-    marker.heightPercent = segmentHeight(modifiedTotalLines);
+    pushRawBlockMarker(
+      original,
+      group,
+      originalLines,
+      originalTotalLines,
+      originalLines.length > 0 ? 'content' : 'blank',
+    );
+    pushRawBlockMarker(
+      modified,
+      group,
+      modifiedLines,
+      modifiedTotalLines,
+      modifiedLines.length > 0 ? 'content' : 'blank',
+    );
   }
 
   return {

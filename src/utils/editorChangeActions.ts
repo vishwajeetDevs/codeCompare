@@ -1,10 +1,11 @@
 import type { editor } from 'monaco-editor';
+import { buildChangeGroups } from '../diff/changeGroups';
 import {
-  applyMoveToLeft,
-  applyMoveToRight,
-  canMoveChangeToLeft,
-  canMoveChangeToRight,
-  getChangeEntryAtLine,
+  applyMoveBlockToLeft,
+  applyMoveBlockToRight,
+  canMoveBlockToLeft,
+  canMoveBlockToRight,
+  getChangeGroupForLine,
 } from '../diff/changeMove';
 import type { LineDiffResult } from '../diff/diffTypes';
 
@@ -40,9 +41,10 @@ export function setupChangeContextMenu(
       return;
     }
 
-    const entry = getChangeEntryAtLine(getAlignedResult(), lineNumber);
-    canMoveLeftKey.set(canMoveChangeToLeft(entry));
-    canMoveRightKey.set(canMoveChangeToRight(entry));
+    const result = getAlignedResult();
+    const group = getChangeGroupForLine(buildChangeGroups(result), lineNumber);
+    canMoveLeftKey.set(group ? canMoveBlockToLeft(result, group) : false);
+    canMoveRightKey.set(group ? canMoveBlockToRight(result, group) : false);
   };
 
   const contextMenuDisposable = codeEditor.onContextMenu((event) => {
@@ -60,27 +62,29 @@ export function setupChangeContextMenu(
 
     const alignedOriginal = original.getValue();
     const alignedModified = modified.getValue();
-    const entry = getChangeEntryAtLine(getAlignedResult(), contextLine);
+    const result = getAlignedResult();
+    const group = getChangeGroupForLine(buildChangeGroups(result), contextLine);
+    if (!group) return;
 
-    const result =
+    const next =
       direction === 'left'
-        ? canMoveChangeToLeft(entry)
-          ? applyMoveToLeft(alignedOriginal, alignedModified, contextLine)
+        ? canMoveBlockToLeft(result, group)
+          ? applyMoveBlockToLeft(alignedOriginal, alignedModified, result, group)
           : null
-        : canMoveChangeToRight(entry)
-          ? applyMoveToRight(alignedOriginal, alignedModified, contextLine)
+        : canMoveBlockToRight(result, group)
+          ? applyMoveBlockToRight(alignedOriginal, alignedModified, result, group)
           : null;
 
-    if (!result) return;
+    if (!next) return;
 
-    original.setValue(result.original);
-    modified.setValue(result.modified);
-    onMerged(result.original, result.modified);
+    original.setValue(next.original);
+    modified.setValue(next.modified);
+    onMerged(next.original, next.modified);
   };
 
   codeEditor.addAction({
     id: `codecompare.moveToLeft.${paneId}`,
-    label: 'Move to Left',
+    label: 'Move Block to Left',
     contextMenuGroupId: '9_codecompare',
     contextMenuOrder: 1,
     precondition: `codecompare.canMoveToLeft.${paneId}`,
@@ -89,7 +93,7 @@ export function setupChangeContextMenu(
 
   codeEditor.addAction({
     id: `codecompare.moveToRight.${paneId}`,
-    label: 'Move to Right',
+    label: 'Move Block to Right',
     contextMenuGroupId: '9_codecompare',
     contextMenuOrder: 2,
     precondition: `codecompare.canMoveToRight.${paneId}`,

@@ -112,17 +112,9 @@ export function SharePopover({
           ) : (
             <>
               Anyone with this link can open both panes and review the differences.
-              {shareLink?.hosted && (
-                <span className="mt-1 block text-xs">
-                  Short link — comparison stored for 90 days.
-                </span>
-              )}
-              {shareLink?.localOnly && (
-                <span className="mt-1 block text-xs">
-                  Large comparison — full link is copied; it includes data in the URL
-                  hash.
-                </span>
-              )}
+              <span className="mt-1 block text-xs">
+                Fixed short link — comparison stored in the database for 90 days.
+              </span>
             </>
           )}
         </p>

@@ -124,15 +124,16 @@ export function createEditorOptions(
       horizontalScrollbarSize: 12,
       alwaysConsumeMouseWheel: false,
     },
+    mouseWheelScrollSensitivity: 3,
     scrollBeyondLastLine: false,
-    smoothScrolling: true,
+    smoothScrolling: false,
 
     // General editing
     readOnly: false,
     renderWhitespace: 'selection',
     fontSize: 14,
     automaticLayout: true,
-    fixedOverflowWidgets: false,
+    fixedOverflowWidgets: true,
     contextmenu: true,
     quickSuggestions: false,
     links: true,

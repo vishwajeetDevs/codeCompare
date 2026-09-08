@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'codecompare-location-pane-visible';
+const STORAGE_KEY = 'codecompare-shortcut-buttons-visible';
 
 function readStoredVisibility(): boolean {
   try {
@@ -13,7 +13,7 @@ function readStoredVisibility(): boolean {
   return true;
 }
 
-export function useLocationPaneVisibility() {
+export function useShortcutButtonsVisibility() {
   const [visible, setVisible] = useState(readStoredVisibility);
 
   useEffect(() => {

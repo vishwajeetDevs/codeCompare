@@ -1,21 +1,15 @@
 import type { EditorSettings } from '../../types/editor';
 import type { ShareLinkResult, SharePayload } from '../../types/share';
 import type { ThemeMode } from '../../types';
-import {
-  createShareDisplayId,
-  decodeSharePayload,
-  encodeSharePayload,
-  MAX_PATH_PAYLOAD_LENGTH,
-  REMOTE_SHARE_THRESHOLD,
-} from './codec';
+import { encodeSharePayload, decodeSharePayload } from './codec';
 import {
   createRemoteShare,
   fetchRemoteShare,
   isRemoteShareId,
 } from './remoteShare';
-import { getShareRecord, previewText, saveShareRecord } from './storage';
+import { previewText, saveShareRecord } from './storage';
 
-/** Short, readable URL for the share popover (full URL is still copied). */
+/** Short fixed-length URL for the share popover. */
 export function formatShareUrlForDisplay(result: ShareLinkResult): string {
   let origin: string;
   try {
@@ -24,20 +18,7 @@ export function formatShareUrlForDisplay(result: ShareLinkResult): string {
     origin = window.location.origin;
   }
 
-  if (result.hosted || result.localOnly) {
-    return `${origin}/c/${result.displayId}`;
-  }
-
-  const pathPrefix = `${origin}/c/`;
-  const payload = result.url.startsWith(pathPrefix)
-    ? result.url.slice(pathPrefix.length)
-    : result.url;
-
-  if (payload.length <= 28) {
-    return result.url;
-  }
-
-  return `${pathPrefix}${payload.slice(0, 14)}…${payload.slice(-10)}`;
+  return `${origin}/c/${result.displayId}`;
 }
 
 export async function buildShareLink(
@@ -55,92 +36,53 @@ export async function buildShareLink(
     theme,
   });
 
-  const displayId = createShareDisplayId(encoded);
-  const origin = window.location.origin;
+  const preview = previewText(original, modified);
+  const remoteId = await createRemoteShare(encoded, preview);
+  if (!remoteId) {
+    throw new Error('Could not create share link');
+  }
 
   saveShareRecord({
-    id: displayId,
+    id: remoteId,
     encoded,
     createdAt: new Date().toISOString(),
-    preview: previewText(original, modified),
+    preview,
   });
 
-  if (encoded.length > REMOTE_SHARE_THRESHOLD) {
-    const remoteId = await createRemoteShare(encoded);
-    if (remoteId) {
-      saveShareRecord({
-        id: remoteId,
-        encoded,
-        createdAt: new Date().toISOString(),
-        preview: previewText(original, modified),
-      });
-
-      return {
-        url: `${origin}/c/${remoteId}`,
-        displayId: remoteId,
-        localOnly: false,
-        hosted: true,
-      };
-    }
-  }
-
-  if (encoded.length <= MAX_PATH_PAYLOAD_LENGTH) {
-    return {
-      url: `${origin}/c/${encoded}`,
-      displayId,
-      localOnly: false,
-    };
-  }
+  const origin = window.location.origin;
 
   return {
-    url: `${origin}/c/${displayId}#${encoded}`,
-    displayId,
-    localOnly: true,
+    url: `${origin}/c/${remoteId}`,
+    displayId: remoteId,
+    localOnly: false,
+    hosted: true,
   };
 }
 
-function payloadFromHash(): SharePayload | null {
-  const hash = window.location.hash.slice(1);
-  if (!hash) return null;
-  return decodeSharePayload(hash);
-}
-
-function payloadFromPathSegment(segment: string): SharePayload | null {
-  const fromPayload = decodeSharePayload(segment);
-  if (fromPayload) return fromPayload;
-
-  const stored = getShareRecord(segment);
-  if (!stored) return null;
-  return decodeSharePayload(stored.encoded);
-}
-
-/** Synchronous load: hash, inline path payload, or local storage only. */
-export function loadSharedComparisonFromUrlSync(): SharePayload | null {
-  const hashPayload = payloadFromHash();
-  if (hashPayload) return hashPayload;
-
-  const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
-  if (!match?.[1]) return null;
-
-  return payloadFromPathSegment(match[1]);
-}
-
-export async function loadSharedComparisonFromUrl(): Promise<SharePayload | null> {
-  const syncPayload = loadSharedComparisonFromUrlSync();
-  if (syncPayload) return syncPayload;
-
+function getShareIdFromPath(): string | null {
   const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
   const segment = match?.[1];
   if (!segment || !isRemoteShareId(segment)) return null;
+  return segment;
+}
 
-  const encoded = await fetchRemoteShare(segment);
+/** Shared links always load from the database asynchronously. */
+export function loadSharedComparisonFromUrlSync(): SharePayload | null {
+  return null;
+}
+
+export async function loadSharedComparisonFromUrl(): Promise<SharePayload | null> {
+  const shareId = getShareIdFromPath();
+  if (!shareId) return null;
+
+  const encoded = await fetchRemoteShare(shareId);
   if (!encoded) return null;
 
   const payload = decodeSharePayload(encoded);
   if (!payload) return null;
 
   saveShareRecord({
-    id: segment,
+    id: shareId,
     encoded,
     createdAt: new Date().toISOString(),
     preview: previewText(payload.original, payload.modified),
@@ -150,19 +92,11 @@ export async function loadSharedComparisonFromUrl(): Promise<SharePayload | null
 }
 
 export function isSharedComparisonUrl(): boolean {
-  return (
-    window.location.pathname.startsWith('/c/') ||
-    window.location.hash.length > 1
-  );
+  return Boolean(getShareIdFromPath());
 }
 
 export function needsAsyncShareLoad(): boolean {
-  if (!isSharedComparisonUrl()) return false;
-  if (loadSharedComparisonFromUrlSync()) return false;
-
-  const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
-  const segment = match?.[1];
-  return Boolean(segment && isRemoteShareId(segment));
+  return isSharedComparisonUrl();
 }
 
 export function clearShareRouteFromUrl(displayId?: string): void {
@@ -175,31 +109,12 @@ export function getShareRouteMeta(): {
   localOnly: boolean;
   hosted: boolean;
 } | null {
-  const payload = loadSharedComparisonFromUrlSync();
-  if (!payload) {
-    const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
-    const segment = match?.[1];
-    if (segment && isRemoteShareId(segment)) {
-      return { displayId: segment, localOnly: false, hosted: true };
-    }
-    return null;
-  }
-
-  const encoded = encodeSharePayload({
-    original: payload.original,
-    modified: payload.modified,
-    language: payload.language,
-    tabSize: payload.tabSize,
-    insertSpaces: payload.insertSpaces,
-    theme: payload.theme,
-  });
-
-  const match = window.location.pathname.match(/^\/c\/([^/]+)\/?$/);
-  const segment = match?.[1] ?? '';
+  const shareId = getShareIdFromPath();
+  if (!shareId) return null;
 
   return {
-    displayId: isRemoteShareId(segment) ? segment : createShareDisplayId(encoded),
-    localOnly: window.location.hash.length > 1,
-    hosted: isRemoteShareId(segment),
+    displayId: shareId,
+    localOnly: false,
+    hosted: true,
   };
 }

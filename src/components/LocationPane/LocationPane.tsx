@@ -66,13 +66,13 @@ function MarkerTrack({
   return (
     <div
       ref={trackRef}
-      className="loc-track relative flex-1 cursor-pointer"
+      className="loc-track relative flex-1"
       onClick={handleTrackClick}
       role="presentation"
     >
       {markers.map((marker) => (
         <button
-          key={`${side}-${marker.alignedLine}-${marker.type}-${marker.kind}`}
+          key={`${side}-block-${marker.changeIndex}`}
           type="button"
           data-change-index={marker.changeIndex}
           className={`loc-marker absolute left-0 right-0 border-0 p-0 ${markerClass(marker, side)}${
@@ -155,7 +155,7 @@ export function LocationPane({
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded px-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)]"
+            className="cursor-default rounded px-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)]"
             aria-label="Hide location pane"
           >
             ×
@@ -180,7 +180,7 @@ export function LocationPane({
         <button
           type="button"
           onClick={onClose}
-          className="cursor-pointer rounded px-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)]"
+          className="cursor-default rounded px-0.5 text-[10px] text-[var(--text-muted)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)]"
           aria-label="Hide location pane"
           title="Hide location pane"
         >
@@ -210,7 +210,7 @@ export function LocationPane({
             aria-hidden="true"
           >
             <div
-              className="loc-viewport-thumb pointer-events-auto absolute left-0 right-0 cursor-grab active:cursor-grabbing"
+              className="loc-viewport-thumb pointer-events-auto absolute left-0 right-0"
               style={{
                 top: `${viewport.topPercent}%`,
                 height: `${viewport.heightPercent}%`,

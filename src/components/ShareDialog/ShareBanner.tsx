@@ -8,8 +8,6 @@ interface ShareBannerProps {
 
 export function ShareBanner({
   displayId,
-  localOnly,
-  hosted,
   onStartNew,
   onDismiss,
 }: ShareBannerProps) {
@@ -20,16 +18,9 @@ export function ShareBanner({
         {displayId && (
           <span className="ml-2 font-mono text-xs">{displayId}</span>
         )}
-        {hosted && (
-          <span className="ml-2 text-xs text-[var(--text-muted)]">
-            (hosted short link)
-          </span>
-        )}
-        {localOnly && (
-          <span className="ml-2 text-xs text-[var(--text-muted)]">
-            (large — uses URL hash)
-          </span>
-        )}
+        <span className="ml-2 text-xs text-[var(--text-muted)]">
+          (database share link)
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <button type="button" className="btn-secondary text-xs" onClick={onStartNew}>

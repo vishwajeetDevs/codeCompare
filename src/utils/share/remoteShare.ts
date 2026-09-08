@@ -1,22 +1,27 @@
-/** 8-char Crockford-style IDs used for server-hosted share links. */
-export const REMOTE_SHARE_ID_PATTERN = /^[0-9A-HJ-NP-Z]{8}$/;
+import { isShareId, SHARE_ID_PATTERN } from './shareId';
+
+/** @deprecated Use SHARE_ID_PATTERN from shareId.ts */
+export const REMOTE_SHARE_ID_PATTERN = SHARE_ID_PATTERN;
 
 export function isRemoteShareId(id: string): boolean {
-  return REMOTE_SHARE_ID_PATTERN.test(id);
+  return isShareId(id);
 }
 
-export async function createRemoteShare(encoded: string): Promise<string | null> {
+export async function createRemoteShare(
+  encoded: string,
+  preview?: string,
+): Promise<string | null> {
   try {
     const response = await fetch('/api/share', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: encoded }),
+      body: JSON.stringify({ data: encoded, preview }),
     });
 
     if (!response.ok) return null;
 
     const body = (await response.json()) as { id?: string };
-    if (!body.id || !isRemoteShareId(body.id)) return null;
+    if (!body.id || !isShareId(body.id)) return null;
 
     return body.id;
   } catch {
@@ -25,7 +30,7 @@ export async function createRemoteShare(encoded: string): Promise<string | null>
 }
 
 export async function fetchRemoteShare(id: string): Promise<string | null> {
-  if (!isRemoteShareId(id)) return null;
+  if (!isShareId(id)) return null;
 
   try {
     const response = await fetch(`/api/share/${id}`);

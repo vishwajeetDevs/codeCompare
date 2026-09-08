@@ -1,4 +1,4 @@
-import { useCallback, useRef, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { clampSplitRatio } from '../../hooks/useSplitRatio';
 
 const DIVIDER_WIDTH_PX = 4;
@@ -9,6 +9,11 @@ interface ResizableSplitPaneProps {
   left: ReactNode;
   right: ReactNode;
   className?: string;
+  showBlockMoveControls?: boolean;
+  canMoveBlockLeft?: boolean;
+  canMoveBlockRight?: boolean;
+  onMoveBlockLeft?: () => void;
+  onMoveBlockRight?: () => void;
 }
 
 export function ResizableSplitPane({
@@ -17,9 +22,15 @@ export function ResizableSplitPane({
   left,
   right,
   className = '',
+  showBlockMoveControls = false,
+  canMoveBlockLeft = false,
+  canMoveBlockRight = false,
+  onMoveBlockLeft,
+  onMoveBlockRight,
 }: ResizableSplitPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const [dividerHovered, setDividerHovered] = useState(false);
 
   const updateRatioFromPointer = useCallback(
     (clientX: number) => {
@@ -45,6 +56,10 @@ export function ResizableSplitPane({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if ((event.target as HTMLElement).closest('.split-divider-move-btn')) {
+        return;
+      }
+
       event.preventDefault();
       draggingRef.current = true;
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -72,7 +87,29 @@ export function ResizableSplitPane({
     [stopDragging],
   );
 
+  const handleMoveLeft = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onMoveBlockLeft?.();
+    },
+    [onMoveBlockLeft],
+  );
+
+  const handleMoveRight = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onMoveBlockRight?.();
+    },
+    [onMoveBlockRight],
+  );
+
   const leftWidth = `calc(${ratio * 100}% - ${ratio * DIVIDER_WIDTH_PX}px)`;
+  const showMoveArrows =
+    showBlockMoveControls &&
+    dividerHovered &&
+    (canMoveBlockLeft || canMoveBlockRight);
 
   return (
     <div
@@ -93,14 +130,44 @@ export function ResizableSplitPane({
         aria-valuemax={80}
         aria-valuenow={Math.round(ratio * 100)}
         aria-label="Resize panes"
-        className="split-divider shrink-0"
+        className="split-divider group shrink-0"
         style={{ width: DIVIDER_WIDTH_PX }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onLostPointerCapture={stopDragging}
-      />
+        onMouseEnter={() => setDividerHovered(true)}
+        onMouseLeave={() => setDividerHovered(false)}
+      >
+        {showMoveArrows && (
+          <div
+            className="split-divider-move-controls"
+            aria-label="Move active change block"
+          >
+            <button
+              type="button"
+              className="split-divider-move-btn"
+              disabled={!canMoveBlockLeft}
+              aria-label="Move block to left"
+              title="Move block to left"
+              onClick={handleMoveLeft}
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              className="split-divider-move-btn"
+              disabled={!canMoveBlockRight}
+              aria-label="Move block to right"
+              title="Move block to right"
+              onClick={handleMoveRight}
+            >
+              →
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="min-h-0 min-w-0 flex-1">{right}</div>
     </div>
