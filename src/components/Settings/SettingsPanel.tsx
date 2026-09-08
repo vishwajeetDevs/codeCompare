@@ -5,11 +5,13 @@ interface SettingsPanelProps {
   wordWrap: boolean;
   locationPaneVisible: boolean;
   shortcutButtonsVisible: boolean;
+  multipleTabsEnabled: boolean;
   onClose: () => void;
   onSwap: () => void;
   onWordWrapChange: (enabled: boolean) => void;
   onLocationPaneVisibleChange: (visible: boolean) => void;
   onShortcutButtonsVisibleChange: (visible: boolean) => void;
+  onMultipleTabsEnabledChange: (enabled: boolean) => void;
 }
 
 export function SettingsPanel({
@@ -17,11 +19,13 @@ export function SettingsPanel({
   wordWrap,
   locationPaneVisible,
   shortcutButtonsVisible,
+  multipleTabsEnabled,
   onClose,
   onSwap,
   onWordWrapChange,
   onLocationPaneVisibleChange,
   onShortcutButtonsVisibleChange,
+  onMultipleTabsEnabledChange,
 }: SettingsPanelProps) {
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(open);
@@ -80,48 +84,66 @@ export function SettingsPanel({
           </button>
         </div>
 
-        <div className="space-y-3 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={wordWrap}
-              onChange={(event) => onWordWrapChange(event.target.checked)}
-            />
-            Word wrap (Alt+Z)
-          </label>
+        <div className="space-y-5 text-sm">
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              This comparison
+            </h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={wordWrap}
+                onChange={(event) => onWordWrapChange(event.target.checked)}
+              />
+              Word wrap (Alt+Z)
+            </label>
+            <button
+              type="button"
+              className="btn-secondary flex w-full items-center justify-between !py-2"
+              onClick={onSwap}
+            >
+              <span>Swap panes</span>
+              <span className="text-xs font-normal text-[var(--text-muted)]">
+                Ctrl+Shift+S
+              </span>
+            </button>
+          </section>
 
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={locationPaneVisible}
-              onChange={(event) =>
-                onLocationPaneVisibleChange(event.target.checked)
-              }
-            />
-            Location pane visibility
-          </label>
-
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={shortcutButtonsVisible}
-              onChange={(event) =>
-                onShortcutButtonsVisibleChange(event.target.checked)
-              }
-            />
-            Shortcut buttons
-          </label>
-
-          <button
-            type="button"
-            className="btn-secondary flex w-full items-center justify-between !py-2"
-            onClick={onSwap}
-          >
-            <span>Swap panes</span>
-            <span className="text-xs font-normal text-[var(--text-muted)]">
-              Ctrl+Shift+S
-            </span>
-          </button>
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Application
+            </h3>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={locationPaneVisible}
+                onChange={(event) =>
+                  onLocationPaneVisibleChange(event.target.checked)
+                }
+              />
+              Location pane visibility
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={shortcutButtonsVisible}
+                onChange={(event) =>
+                  onShortcutButtonsVisibleChange(event.target.checked)
+                }
+              />
+              Shortcut buttons
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={multipleTabsEnabled}
+                onChange={(event) =>
+                  onMultipleTabsEnabledChange(event.target.checked)
+                }
+              />
+              Enable multiple tabs
+            </label>
+          </section>
         </div>
       </aside>
     </div>

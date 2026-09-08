@@ -96,6 +96,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
@@ -386,6 +387,24 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
   .settings-panel-backdrop {
     transition: none !important;
   }
+}
+
+/* Comparison tabs */
+.comparison-tab-bar {
+  scrollbar-width: none;
+}
+
+.comparison-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.comparison-tab-close {
+  line-height: 1;
+}
+
+.comparison-tab-name-input {
+  min-width: 0;
+  width: 100%;
 }
 
 /* Location pane minimap */

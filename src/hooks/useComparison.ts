@@ -16,7 +16,7 @@ import {
   downloadTextFile,
   filenameForLanguage,
 } from '../utils/download';
-import { resolveEditorLanguage } from '../utils/editorConfig';
+import { DEFAULT_EDITOR_SETTINGS, resolveEditorLanguage } from '../utils/editorConfig';
 import {
   buildShareLink,
   getShareRouteMeta,
@@ -30,14 +30,32 @@ import {
   saveComparisonDraft,
 } from '../utils/comparisonStorage';
 import type { ThemeMode } from '../types';
-import { useEditorSettings } from './useEditorSettings';
+import type { ComparisonTabState } from '../types/comparisonTab';
+import { DEFAULT_TAB_TITLE } from '../types/comparisonTab';
 import { useToast } from './useToast';
 
 const LARGE_FILE_LINE_THRESHOLD = 5000;
 
 export type ComparisonPhase = 'idle' | 'compared' | 'stale';
 
-function readInitialComparison(): { original: string; modified: string } {
+export interface UseComparisonOptions {
+  applySharedTheme?: (theme: ThemeMode) => void;
+  persistDraft?: boolean;
+  loadSharedFromUrl?: boolean;
+  initialTabState?: ComparisonTabState;
+}
+
+function readInitialComparison(initialTabState?: ComparisonTabState): {
+  original: string;
+  modified: string;
+} {
+  if (initialTabState) {
+    return {
+      original: initialTabState.original,
+      modified: initialTabState.modified,
+    };
+  }
+
   const shared = loadSharedComparisonFromUrlSync();
   if (shared) {
     return { original: shared.original, modified: shared.modified };
@@ -45,7 +63,9 @@ function readInitialComparison(): { original: string; modified: string } {
   return loadComparisonDraft();
 }
 
-function initialPhase(): ComparisonPhase {
+function initialPhase(initialTabState?: ComparisonTabState): ComparisonPhase {
+  if (initialTabState) return initialTabState.phase;
+
   const shared = loadSharedComparisonFromUrlSync();
   if (shared?.original.trim() && shared?.modified.trim()) return 'compared';
   return 'idle';
@@ -58,34 +78,52 @@ function countLines(text: string): number {
 
 export function useComparison(
   theme: ThemeMode,
-  applySharedTheme?: (theme: ThemeMode) => void,
+  options: UseComparisonOptions = {},
 ) {
-  const initial = readInitialComparison();
-  const startingPhase = initialPhase();
+  const {
+    applySharedTheme,
+    persistDraft = true,
+    loadSharedFromUrl = true,
+    initialTabState,
+  } = options;
+
+  const initial = readInitialComparison(initialTabState);
+  const startingPhase = initialPhase(initialTabState);
 
   const [original, setOriginal] = useState(initial.original);
   const [modified, setModified] = useState(initial.modified);
   const [phase, setPhase] = useState<ComparisonPhase>(startingPhase);
   const [snapshot, setSnapshot] = useState(() =>
-    startingPhase === 'compared'
-      ? { original: initial.original, modified: initial.modified }
-      : { original: '', modified: '' },
+    initialTabState?.snapshot ??
+      (startingPhase === 'compared'
+        ? { original: initial.original, modified: initial.modified }
+        : { original: '', modified: '' }),
   );
   const [compareVersion, setCompareVersion] = useState(
-    startingPhase === 'compared' ? 1 : 0,
+    initialTabState?.compareVersion ??
+      (startingPhase === 'compared' ? 1 : 0),
   );
   const [isComparing, setIsComparing] = useState(false);
   const [sharedView, setSharedView] = useState<{
     displayId: string;
     localOnly: boolean;
     hosted?: boolean;
-  } | null>(() => getShareRouteMeta());
-  const [isLoadingShare, setIsLoadingShare] = useState(needsAsyncShareLoad);
-  const { settings, updateSettings } = useEditorSettings();
+  } | null>(() => (loadSharedFromUrl ? getShareRouteMeta() : null));
+  const [isLoadingShare, setIsLoadingShare] = useState(
+    loadSharedFromUrl ? needsAsyncShareLoad() : false,
+  );
+  const [settings, setSettings] = useState(
+    initialTabState?.settings ?? DEFAULT_EDITOR_SETTINGS,
+  );
+  const updateSettings = useCallback((partial: Partial<typeof settings>) => {
+    setSettings((current) => ({ ...current, ...partial }));
+  }, []);
   const { showToast } = useToast();
   const editorRef = useRef<CompareEditorHandle>(null);
 
   useEffect(() => {
+    if (!loadSharedFromUrl) return;
+
     let cancelled = false;
 
     async function applySharedPayload() {
@@ -144,15 +182,17 @@ export function useComparison(
     return () => {
       cancelled = true;
     };
-  }, [updateSettings, applySharedTheme]);
+  }, [updateSettings, applySharedTheme, loadSharedFromUrl]);
 
   useEffect(() => {
+    if (!persistDraft) return;
+
     const timer = window.setTimeout(() => {
       saveComparisonDraft(original, modified);
     }, 400);
 
     return () => window.clearTimeout(timer);
-  }, [original, modified]);
+  }, [original, modified, persistDraft]);
 
   useEffect(() => {
     if (!original.trim() && !modified.trim()) {
@@ -299,9 +339,11 @@ export function useComparison(
     setPhase('idle');
     setCompareVersion(0);
     editorRef.current?.clearBoth();
-    clearComparisonDraft();
+    if (persistDraft) {
+      clearComparisonDraft();
+    }
     showToast('Editors cleared', 'info');
-  }, [showToast]);
+  }, [persistDraft, showToast]);
 
   const format = useCallback(async () => {
     try {
@@ -354,10 +396,12 @@ export function useComparison(
     setPhase('idle');
     setCompareVersion(0);
     editorRef.current?.clearBoth();
-    clearComparisonDraft();
+    if (persistDraft) {
+      clearComparisonDraft();
+    }
     window.history.replaceState({}, '', '/');
     showToast('Started new comparison', 'info');
-  }, [showToast]);
+  }, [persistDraft, showToast]);
 
   const dismissSharedBanner = useCallback(() => {
     setSharedView(null);
@@ -403,6 +447,37 @@ export function useComparison(
     [original, modified, settings.language, reportText, showToast],
   );
 
+  const captureTabState = useCallback(
+    (tabId: string, extras: {
+      scrollRatio: number;
+      activeChangeIndex: number;
+      splitRatio: number;
+      title?: string;
+      titleCustomized?: boolean;
+    }): ComparisonTabState => ({
+      id: tabId,
+      title: extras.title ?? DEFAULT_TAB_TITLE,
+      titleCustomized: extras.titleCustomized ?? false,
+      original,
+      modified,
+      phase,
+      snapshot,
+      compareVersion,
+      settings,
+      scrollRatio: extras.scrollRatio,
+      activeChangeIndex: extras.activeChangeIndex,
+      splitRatio: extras.splitRatio,
+    }),
+    [
+      original,
+      modified,
+      phase,
+      snapshot,
+      compareVersion,
+      settings,
+    ],
+  );
+
   return {
     original,
     modified,
@@ -438,5 +513,6 @@ export function useComparison(
     isEmpty,
     isLargeFile,
     isComparing,
+    captureTabState,
   };
 };

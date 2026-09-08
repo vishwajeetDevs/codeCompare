@@ -56,6 +56,7 @@ interface DiffEditorProps {
   onSplitRatioChange?: (ratio: number) => void;
   onScrollMetrics?: (metrics: EditorScrollMetrics) => void;
   onToggleWordWrap?: () => void;
+  instanceId?: string;
 }
 
 export interface CompareEditorHandle {
@@ -65,6 +66,7 @@ export interface CompareEditorHandle {
   scrollToRatio: (ratio: number) => void;
   getRawContents: () => { original: string; modified: string };
   swapPanes: (nextOriginal: string, nextModified: string) => void;
+  getScrollRatio: () => number;
 }
 
 function applyModelSettings(
@@ -128,6 +130,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       onSplitRatioChange,
       onScrollMetrics,
       onToggleWordWrap,
+      instanceId = 'default',
     },
     ref,
   ) {
@@ -399,6 +402,17 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         lastExternalSyncKeyRef.current = '';
         syncEditorValue(orig, nextOriginal, isSyncingRef);
         syncEditorValue(mod, nextModified, isSyncingRef);
+      },
+      getScrollRatio: () => {
+        const orig = originalRef.current;
+        if (!orig) return 0;
+
+        const maxScroll = Math.max(
+          orig.getScrollHeight() - orig.getLayoutInfo().height,
+          0,
+        );
+        if (maxScroll <= 0) return 0;
+        return orig.getScrollTop() / maxScroll;
       },
     }));
 
@@ -875,6 +889,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           beforeMount={handleBeforeMount}
           onMount={mountOriginal}
           options={createEditorOptions(settings)}
+          path={`${instanceId}-original`}
         />
         </div>
       );
@@ -891,6 +906,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           beforeMount={handleBeforeMount}
           onMount={mountModified}
           options={createEditorOptions(settings)}
+          path={`${instanceId}-modified`}
         />
         </div>
       );
@@ -908,7 +924,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               beforeMount={handleBeforeMount}
               onMount={mountOriginal}
               options={createEditorOptions(settings)}
-              path="original-editor"
+              path={`${instanceId}-original`}
             />
           </div>
           <div className="editor-pane relative h-full min-h-0">
@@ -920,7 +936,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               beforeMount={handleBeforeMount}
               onMount={mountModified}
               options={createEditorOptions(settings)}
-              path="modified-editor"
+              path={`${instanceId}-modified`}
             />
           </div>
         </div>
@@ -944,7 +960,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               beforeMount={handleBeforeMount}
               onMount={mountOriginal}
               options={createEditorOptions(settings)}
-              path="original-editor"
+              path={`${instanceId}-original`}
             />
           </div>
         }
@@ -958,7 +974,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
               beforeMount={handleBeforeMount}
               onMount={mountModified}
               options={createEditorOptions(settings)}
-              path="modified-editor"
+              path={`${instanceId}-modified`}
             />
           </div>
         }

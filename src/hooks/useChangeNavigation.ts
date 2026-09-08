@@ -7,6 +7,7 @@ export function useChangeNavigation(
   rawResult: LineDiffResult,
   compareVersion: number,
   enabled = true,
+  initialActiveIndex = -1,
 ) {
   const alignedResult = useMemo(
     () => (enabled ? buildAlignedView(rawResult).result : rawResult),
@@ -18,7 +19,7 @@ export function useChangeNavigation(
     [alignedResult, enabled],
   );
 
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [activeIndex, setActiveIndex] = useState(initialActiveIndex);
 
   useEffect(() => {
     if (!enabled) {
@@ -29,9 +30,12 @@ export function useChangeNavigation(
     setActiveIndex((current) => {
       if (groups.length === 0) return -1;
       if (current >= 0 && current < groups.length) return current;
+      if (initialActiveIndex >= 0 && initialActiveIndex < groups.length) {
+        return initialActiveIndex;
+      }
       return 0;
     });
-  }, [groups.length, compareVersion, enabled]);
+  }, [groups.length, compareVersion, enabled, initialActiveIndex]);
 
   const goNext = useCallback(() => {
     if (!enabled || groups.length === 0) return;
