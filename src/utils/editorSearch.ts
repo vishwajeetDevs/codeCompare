@@ -130,10 +130,6 @@ export function setupEditorSearch(
     void codeEditor.trigger('codecompare', 'actions.findWithReplace', null);
   };
 
-  const closeFind = () => {
-    closeFindWidget(codeEditor);
-  };
-
   codeEditor.addCommand(
     monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF,
     openFind,
@@ -146,27 +142,10 @@ export function setupEditorSearch(
     whenFocused,
   );
 
-  codeEditor.addCommand(
-    monaco.KeyMod.Alt | monaco.KeyCode.KeyZ,
-    closeFind,
-    whenFocused,
-  );
-
   const domNode = codeEditor.getContainerDomNode();
   const unbindFindWidgetEvents = bindFindWidgetEvents(domNode);
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'z') {
-      if (!domNode.contains(event.target as Node) && !codeEditor.hasTextFocus()) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      closeFind();
-      return;
-    }
-
     if (!(event.ctrlKey || event.metaKey)) return;
 
     const key = event.key.toLowerCase();
@@ -190,5 +169,24 @@ export function setupEditorSearch(
       domNode.removeEventListener('keydown', onKeyDown, true);
       unbindFindWidgetEvents();
     },
+  };
+}
+
+/** Wire Alt+Z to toggle word wrap while an editor pane is focused. */
+export function setupEditorWordWrapShortcut(
+  codeEditor: editor.IStandaloneCodeEditor,
+  monaco: Monaco,
+  onToggleWordWrap: () => void,
+): { dispose: () => void } {
+  const editorId = codeEditor.getId();
+  const whenFocused = `editorFocus && editorId == '${editorId}'`;
+  codeEditor.addCommand(
+    monaco.KeyMod.Alt | monaco.KeyCode.KeyZ,
+    onToggleWordWrap,
+    whenFocused,
+  );
+
+  return {
+    dispose: () => undefined,
   };
 }

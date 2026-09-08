@@ -85,7 +85,7 @@ export function SettingsPanel({
               checked={wordWrap}
               onChange={(event) => onWordWrapChange(event.target.checked)}
             />
-            Word wrap
+            Word wrap (Alt+Z)
           </label>
 
           <label className="flex items-center gap-2">

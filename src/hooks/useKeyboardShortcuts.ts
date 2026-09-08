@@ -8,7 +8,7 @@ interface ShortcutHandlers {
   onToggleSettings: () => void;
   onPrevChange?: () => void;
   onNextChange?: () => void;
-  onCloseFind?: () => void;
+  onToggleWordWrap?: () => void;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true) {
@@ -61,8 +61,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true)
       }
 
       if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'z') {
+        const target = event.target;
+        if (target instanceof Node && (target as Element).closest?.('.monaco-editor')) {
+          return;
+        }
         event.preventDefault();
-        handlers.onCloseFind?.();
+        handlers.onToggleWordWrap?.();
+        return;
       }
     };
 
@@ -79,5 +84,5 @@ export const KEYBOARD_SHORTCUTS = [
   { keys: 'Ctrl+,', action: 'Settings' },
   { keys: 'Alt+↑', action: 'Previous change' },
   { keys: 'Alt+↓', action: 'Next change' },
-  { keys: 'Alt+Z', action: 'Close find bar' },
+  { keys: 'Alt+Z', action: 'Toggle word wrap' },
 ] as const;

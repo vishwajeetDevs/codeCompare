@@ -112,9 +112,6 @@ export function SharePopover({
           ) : (
             <>
               Anyone with this link can open both panes and review the differences.
-              <span className="mt-1 block text-xs">
-                Fixed short link — comparison stored in the database for 90 days.
-              </span>
             </>
           )}
         </p>

@@ -9,6 +9,11 @@ function splitLines(value: string): string[] {
 
 export { splitLines };
 
+/** True when a line is empty or contains only whitespace. */
+export function isBlankLine(line: string): boolean {
+  return line.trim() === '';
+}
+
 /** Remove trailing whitespace-only lines (prevents blank-line diff growth on refresh). */
 export function stripTrailingBlankLines(text: string): string {
   const lines = splitLines(text);

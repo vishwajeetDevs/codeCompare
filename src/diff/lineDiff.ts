@@ -1,5 +1,5 @@
 import { diffLines } from 'diff';
-import { stripTrailingBlankLines } from './alignTexts';
+import { isBlankLine, stripTrailingBlankLines } from './alignTexts';
 import type { DiffType, LineDiffEntry, LineDiffResult } from './diffTypes';
 
 function splitIntoLines(value: string): string[] {
@@ -20,6 +20,11 @@ type AlignOp =
   | { type: 'added'; content: string }
   | { type: 'modified'; original: string; modified: string };
 
+function linesEquivalent(a: string, b: string): boolean {
+  if (a === b) return true;
+  return isBlankLine(a) && isBlankLine(b);
+}
+
 function toSegments(original: string, modified: string): Segment[] {
   return diffLines(original, modified).map((change) => ({
     type: change.added ? 'added' : change.removed ? 'removed' : 'unchanged',
@@ -34,7 +39,7 @@ function lcsAlign(removed: string[], added: string[]): AlignOp[] {
 
   for (let i = 1; i <= m; i += 1) {
     for (let j = 1; j <= n; j += 1) {
-      if (removed[i - 1] === added[j - 1]) {
+      if (linesEquivalent(removed[i - 1]!, added[j - 1]!)) {
         dp[i][j] = dp[i - 1][j - 1] + 1;
       } else {
         dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
@@ -47,8 +52,8 @@ function lcsAlign(removed: string[], added: string[]): AlignOp[] {
   let j = n;
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && removed[i - 1] === added[j - 1]) {
-      stack.push({ type: 'unchanged', content: removed[i - 1] });
+    if (i > 0 && j > 0 && linesEquivalent(removed[i - 1]!, added[j - 1]!)) {
+      stack.push({ type: 'unchanged', content: removed[i - 1]! });
       i -= 1;
       j -= 1;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
@@ -94,6 +99,7 @@ function lineSimilarity(a: string, b: string): number {
 const MODIFIED_SIMILARITY_THRESHOLD = 0.45;
 
 function shouldTreatAsModified(original: string, modified: string): boolean {
+  if (isBlankLine(original) && isBlankLine(modified)) return false;
   return lineSimilarity(original, modified) >= MODIFIED_SIMILARITY_THRESHOLD;
 }
 
@@ -104,6 +110,17 @@ function mergeToModified(ops: AlignOp[]): AlignOp[] {
   for (let index = 0; index < ops.length; index += 1) {
     const current = ops[index];
     const next = ops[index + 1];
+
+    if (
+      current.type === 'removed' &&
+      next?.type === 'added' &&
+      isBlankLine(current.content) &&
+      isBlankLine(next.content)
+    ) {
+      merged.push({ type: 'unchanged', content: '' });
+      index += 1;
+      continue;
+    }
 
     if (
       current.type === 'removed' &&
@@ -127,10 +144,18 @@ function mergeToModified(ops: AlignOp[]): AlignOp[] {
 
 function alignHunk(removed: string[], added: string[]): AlignOp[] {
   if (removed.length === 0) {
-    return added.map((content) => ({ type: 'added', content }));
+    return added.map((content) =>
+      isBlankLine(content)
+        ? { type: 'unchanged', content: '' }
+        : { type: 'added', content },
+    );
   }
   if (added.length === 0) {
-    return removed.map((content) => ({ type: 'removed', content }));
+    return removed.map((content) =>
+      isBlankLine(content)
+        ? { type: 'unchanged', content: '' }
+        : { type: 'removed', content },
+    );
   }
 
   if (removed.length === added.length) {
@@ -138,7 +163,7 @@ function alignHunk(removed: string[], added: string[]): AlignOp[] {
     for (let index = 0; index < removed.length; index += 1) {
       const original = removed[index]!;
       const modifiedLine = added[index]!;
-      if (original === modifiedLine) {
+      if (linesEquivalent(original, modifiedLine)) {
         ops.push({ type: 'unchanged', content: original });
       } else if (shouldTreatAsModified(original, modifiedLine)) {
         ops.push({ type: 'modified', original, modified: modifiedLine });

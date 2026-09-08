@@ -147,7 +147,7 @@ export function LocationPane({
 
   if (model.totalLines <= 1 && groups.length === 0) {
     return (
-      <aside className="location-pane hidden w-14 shrink-0 flex-col border-l border-[var(--border)] bg-[var(--surface-2)] md:flex">
+      <aside className="location-pane hidden w-14 shrink-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[var(--surface-2)] md:flex">
         <div className="flex items-center justify-between gap-1 border-b border-[var(--border)] px-1.5 py-1.5">
           <span className="truncate text-[9px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
             Location
@@ -170,7 +170,7 @@ export function LocationPane({
 
   return (
     <aside
-      className="location-pane hidden w-14 shrink-0 flex-col border-l border-[var(--border)] bg-[var(--surface-2)] md:flex"
+      className="location-pane hidden w-14 shrink-0 flex-col overflow-hidden border-l border-[var(--border)] bg-[var(--surface-2)] md:flex"
       aria-label="Location pane"
     >
       <div className="flex items-center justify-between gap-1 border-b border-[var(--border)] px-1.5 py-1.5">
@@ -188,8 +188,8 @@ export function LocationPane({
         </button>
       </div>
 
-      <div className="relative min-h-0 flex-1 p-1">
-        <div className="relative flex h-full gap-0.5">
+      <div className="relative min-h-0 flex-1 overflow-hidden p-1">
+        <div className="relative flex h-full min-w-0 gap-0.5 overflow-hidden">
           <MarkerTrack
             markers={model.original}
             side="original"

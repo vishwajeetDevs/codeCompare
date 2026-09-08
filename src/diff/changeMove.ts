@@ -27,28 +27,41 @@ export function getChangeGroupForLine(
   );
 }
 
-export function canMoveChangeToLeft(entry: LineDiffEntry | null): boolean {
-  return (
-    entry != null &&
-    entry.type !== 'unchanged' &&
-    entry.type !== 'removed'
-  );
+export function canMoveChangeToLeft(
+  entry: LineDiffEntry | null,
+  modifiedLineText = '',
+): boolean {
+  if (entry == null || entry.type === 'unchanged') return false;
+  if (entry.type === 'modified' || entry.type === 'added') return true;
+  return entry.type === 'removed' && modifiedLineText.length > 0;
 }
 
-export function canMoveChangeToRight(entry: LineDiffEntry | null): boolean {
-  return (
-    entry != null &&
-    entry.type !== 'unchanged' &&
-    entry.type !== 'added'
-  );
+export function canMoveChangeToRight(
+  entry: LineDiffEntry | null,
+  originalLineText = '',
+): boolean {
+  if (entry == null || entry.type === 'unchanged') return false;
+  if (entry.type === 'modified' || entry.type === 'removed') return true;
+  return entry.type === 'added' && originalLineText.length > 0;
 }
 
 export function canMoveBlockToLeft(
   result: LineDiffResult,
   group: ChangeGroup,
+  alignedModified = '',
 ): boolean {
+  if (group.type === 'modified') return true;
+
+  const modLines = splitLines(alignedModified);
   for (let line = group.alignedLineStart; line <= group.alignedLineEnd; line += 1) {
-    if (canMoveChangeToLeft(getChangeEntryAtLine(result, line))) return true;
+    if (
+      canMoveChangeToLeft(
+        getChangeEntryAtLine(result, line),
+        modLines[line - 1] ?? '',
+      )
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -56,9 +69,20 @@ export function canMoveBlockToLeft(
 export function canMoveBlockToRight(
   result: LineDiffResult,
   group: ChangeGroup,
+  alignedOriginal = '',
 ): boolean {
+  if (group.type === 'modified') return true;
+
+  const origLines = splitLines(alignedOriginal);
   for (let line = group.alignedLineStart; line <= group.alignedLineEnd; line += 1) {
-    if (canMoveChangeToRight(getChangeEntryAtLine(result, line))) return true;
+    if (
+      canMoveChangeToRight(
+        getChangeEntryAtLine(result, line),
+        origLines[line - 1] ?? '',
+      )
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -118,7 +142,7 @@ export function applyMoveBlockToLeft(
 
   for (let line = group.alignedLineStart; line <= group.alignedLineEnd; line += 1) {
     const entry = getChangeEntryAtLine(result, line);
-    if (!canMoveChangeToLeft(entry)) continue;
+    if (!canMoveChangeToLeft(entry, splitLines(modified)[line - 1] ?? '')) continue;
 
     const next = applyMoveToLeft(original, modified, line);
     if (!next) continue;
@@ -144,7 +168,7 @@ export function applyMoveBlockToRight(
 
   for (let line = group.alignedLineStart; line <= group.alignedLineEnd; line += 1) {
     const entry = getChangeEntryAtLine(result, line);
-    if (!canMoveChangeToRight(entry)) continue;
+    if (!canMoveChangeToRight(entry, splitLines(original)[line - 1] ?? '')) continue;
 
     const next = applyMoveToRight(original, modified, line);
     if (!next) continue;

@@ -1,4 +1,5 @@
 import type { DiffType, LineDiffResult } from './diffTypes';
+import { isBlankLine } from './alignTexts';
 
 export interface ChangeGroup {
   index: number;
@@ -26,6 +27,32 @@ function shouldExtendBlock(
   return false;
 }
 
+function isBlankOnlyChangeEntry(
+  entry: LineDiffResult['entries'][number],
+): boolean {
+  if (entry.type === 'unchanged') return true;
+  if (entry.type === 'modified') {
+    return (
+      isBlankLine(entry.originalContent ?? entry.content) &&
+      isBlankLine(entry.modifiedContent ?? entry.content)
+    );
+  }
+  return isBlankLine(entry.content);
+}
+
+function isBlankOnlyBlock(
+  result: LineDiffResult,
+  alignedLineStart: number,
+  alignedLineEnd: number,
+): boolean {
+  for (let line = alignedLineStart; line <= alignedLineEnd; line += 1) {
+    const entry = result.entries[line - 1];
+    if (!entry || entry.type === 'unchanged') continue;
+    if (!isBlankOnlyChangeEntry(entry)) return false;
+  }
+  return true;
+}
+
 /**
  * Build navigation groups from an aligned diff result.
  * Groups split on unchanged lines and on change-type boundaries so blank padding
@@ -44,6 +71,14 @@ export function buildChangeGroups(result: LineDiffResult): ChangeGroup[] {
 
     const alignedLineStart = blockStart;
     const alignedLineEnd = blockEnd;
+    if (isBlankOnlyBlock(result, alignedLineStart, alignedLineEnd)) {
+      blockStart = null;
+      blockEnd = 0;
+      blockEndType = null;
+      blockTypes.clear();
+      return;
+    }
+
     groups.push({
       index: groups.length,
       type: resolveBlockType(blockTypes),

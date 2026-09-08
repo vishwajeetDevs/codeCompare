@@ -2,10 +2,12 @@ import { Editor } from '@monaco-editor/react';
 import type { Monaco } from '@monaco-editor/react';
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import type { editor } from 'monaco-editor';
 import { alignedEditorsToRaw, buildAlignedView, stripTrailingBlankLines } from '../../diff/alignTexts';
@@ -27,10 +29,13 @@ import {
   resolveEditorLanguage,
   setupMonaco,
 } from '../../utils/editorConfig';
-import { setupEditorSearch, closeFindWidget } from '../../utils/editorSearch';
+import { setupEditorSearch, setupEditorWordWrapShortcut, closeFindWidget } from '../../utils/editorSearch';
+import { setupEditorJsonPaste } from '../../utils/editorJsonPaste';
+import { formatJson, needsJsonFormatting } from '../../utils/jsonFormat';
 import { setupEditorCopy } from '../../utils/editorCopy';
 import { setupChangeContextMenu } from '../../utils/editorChangeActions';
 import { ResizableSplitPane } from '../Layout/ResizableSplitPane';
+import type { BlockMoveControlMarker } from '../Layout/ResizableSplitPane';
 
 interface DiffEditorProps {
   original: string;
@@ -50,6 +55,7 @@ interface DiffEditorProps {
   splitRatio?: number;
   onSplitRatioChange?: (ratio: number) => void;
   onScrollMetrics?: (metrics: EditorScrollMetrics) => void;
+  onToggleWordWrap?: () => void;
 }
 
 export interface CompareEditorHandle {
@@ -120,6 +126,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       splitRatio = 0.5,
       onSplitRatioChange,
       onScrollMetrics,
+      onToggleWordWrap,
     },
     ref,
   ) {
@@ -142,6 +149,11 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     const copyDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const searchDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const changeActionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const wordWrapDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const jsonPasteDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const blockMovePositionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const onToggleWordWrapRef = useRef(onToggleWordWrap);
+    onToggleWordWrapRef.current = onToggleWordWrap;
 
     const rawResult = useMemo(
       () => displayDiffResult ?? createEmptyLineDiffResult(),
@@ -168,22 +180,85 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       [alignedView.result, shouldAlign],
     );
 
-    const activeChangeGroup =
-      activeChangeIndex >= 0 ? changeGroups[activeChangeIndex] : undefined;
+    const [blockMoveControls, setBlockMoveControls] = useState<
+      BlockMoveControlMarker[]
+    >([]);
 
-    const canMoveActiveBlockLeft =
-      shouldAlign &&
-      activeChangeGroup != null &&
-      canMoveBlockToLeft(alignedView.result, activeChangeGroup);
-
-    const canMoveActiveBlockRight =
-      shouldAlign &&
-      activeChangeGroup != null &&
-      canMoveBlockToRight(alignedView.result, activeChangeGroup);
-
-    const monacoTheme = getMonacoTheme(theme);
     const shouldAlignRef = useRef(shouldAlign);
     shouldAlignRef.current = shouldAlign;
+
+    const updateBlockMoveControlPositions = useCallback(() => {
+      const orig = originalRef.current;
+      const mod = modifiedRef.current;
+      if (!orig || !mod || !shouldAlignRef.current || changeGroups.length === 0) {
+        setBlockMoveControls([]);
+        return;
+      }
+
+      const viewportHeight = orig.getLayoutInfo().height;
+      const result = alignedResultRef.current;
+      const alignedOriginal = orig.getValue();
+      const alignedModified = mod.getValue();
+      const markers: BlockMoveControlMarker[] = [];
+      const controlHalfHeight = 12;
+
+      for (const group of changeGroups) {
+        const visiblePosition = orig.getScrolledVisiblePosition({
+          lineNumber: group.alignedLine,
+          column: 1,
+        });
+        if (!visiblePosition) continue;
+
+        const lineTop = visiblePosition.top;
+        const lineBottom = visiblePosition.top + visiblePosition.height;
+        if (lineBottom < 0 || lineTop > viewportHeight) continue;
+
+        const centerY = lineTop + visiblePosition.height / 2;
+        if (
+          centerY < controlHalfHeight ||
+          centerY > viewportHeight - controlHalfHeight
+        ) {
+          continue;
+        }
+
+        markers.push({
+          groupIndex: group.index,
+          topPx: centerY,
+          canMoveLeft: canMoveBlockToLeft(result, group, alignedModified),
+          canMoveRight: canMoveBlockToRight(result, group, alignedOriginal),
+          isActive: group.index === activeChangeIndex,
+        });
+      }
+
+      setBlockMoveControls(markers);
+    }, [activeChangeIndex, changeGroups]);
+
+    const setupBlockMovePositionTracking = useCallback(() => {
+      blockMovePositionDisposablesRef.current.forEach((disposable) =>
+        disposable.dispose(),
+      );
+      blockMovePositionDisposablesRef.current = [];
+
+      updateBlockMoveControlPositions();
+
+      const orig = originalRef.current;
+      if (!orig) return;
+
+      blockMovePositionDisposablesRef.current.push(
+        orig.onDidScrollChange(updateBlockMoveControlPositions),
+        orig.onDidLayoutChange(updateBlockMoveControlPositions),
+      );
+
+      const mod = modifiedRef.current;
+      if (mod) {
+        blockMovePositionDisposablesRef.current.push(
+          mod.onDidScrollChange(updateBlockMoveControlPositions),
+          mod.onDidLayoutChange(updateBlockMoveControlPositions),
+        );
+      }
+    }, [updateBlockMoveControlPositions]);
+
+    const monacoTheme = getMonacoTheme(theme);
     const isAlignedMode = () =>
       shouldAlignRef.current && !showOriginalOnly && !showModifiedOnly;
 
@@ -408,15 +483,15 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       publishRawFromAligned(alignedOriginal, alignedModified);
     };
 
-    const applyActiveBlockMove = (direction: 'left' | 'right') => {
+    const applyBlockMove = (groupIndex: number, direction: 'left' | 'right') => {
       const orig = originalRef.current;
       const mod = modifiedRef.current;
-      if (!orig || !mod || !shouldAlignRef.current || activeChangeIndex < 0) {
+      if (!orig || !mod || !shouldAlignRef.current) {
         return;
       }
 
       const groups = buildChangeGroups(alignedResultRef.current);
-      const group = groups[activeChangeIndex];
+      const group = groups[groupIndex];
       if (!group) return;
 
       const result = alignedResultRef.current;
@@ -448,6 +523,43 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       publishRawFromAligned(next.original, next.modified);
     };
 
+    const maybeFormatBothPanesIfJson = () => {
+      const orig = originalRef.current;
+      const mod = modifiedRef.current;
+      if (!orig || !mod || isSyncingRef.current) return;
+
+      const origValue = orig.getValue();
+      const modValue = mod.getValue();
+      const nextOrig = needsJsonFormatting(origValue)
+        ? formatJson(origValue) ?? origValue
+        : origValue;
+      const nextMod = needsJsonFormatting(modValue)
+        ? formatJson(modValue) ?? modValue
+        : modValue;
+
+      if (nextOrig === origValue && nextMod === modValue) return;
+
+      isSyncingRef.current = true;
+      try {
+        if (nextOrig !== origValue) orig.setValue(nextOrig);
+        if (nextMod !== modValue) mod.setValue(nextMod);
+      } finally {
+        isSyncingRef.current = false;
+      }
+
+      if (shouldAlignRef.current) {
+        publishRawFromAligned(orig.getValue(), mod.getValue());
+      } else {
+        markEditorDrivenUpdate();
+        if (nextOrig !== origValue) {
+          onOriginalChange?.(stripTrailingBlankLines(nextOrig));
+        }
+        if (nextMod !== modValue) {
+          onModifiedChange?.(stripTrailingBlankLines(nextMod));
+        }
+      }
+    };
+
     const mountOriginal = (instance: editor.IStandaloneCodeEditor) => {
       originalRef.current = instance;
       applyModelSettings(instance, settings);
@@ -477,6 +589,18 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
             isAlignedMode,
           ),
         );
+        if (onToggleWordWrapRef.current) {
+          wordWrapDisposablesRef.current.push(
+            setupEditorWordWrapShortcut(instance, monacoRef.current, () => {
+              onToggleWordWrapRef.current?.();
+            }),
+          );
+        }
+        jsonPasteDisposablesRef.current.push(
+          setupEditorJsonPaste(instance, {
+            onAfterJsonPaste: maybeFormatBothPanesIfJson,
+          }),
+        );
       }
       instance.onDidChangeModelContent(() => {
         if (isSyncingRef.current) return;
@@ -495,6 +619,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         publishRawFromAligned(instance.getValue(), mod.getValue());
       });
       wireScrollSync();
+      setupBlockMovePositionTracking();
       applyDecorations();
       publishScrollMetrics();
     };
@@ -528,6 +653,18 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
             isAlignedMode,
           ),
         );
+        if (onToggleWordWrapRef.current) {
+          wordWrapDisposablesRef.current.push(
+            setupEditorWordWrapShortcut(instance, monacoRef.current, () => {
+              onToggleWordWrapRef.current?.();
+            }),
+          );
+        }
+        jsonPasteDisposablesRef.current.push(
+          setupEditorJsonPaste(instance, {
+            onAfterJsonPaste: maybeFormatBothPanesIfJson,
+          }),
+        );
       }
       instance.onDidChangeModelContent(() => {
         if (isSyncingRef.current) return;
@@ -546,6 +683,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         publishRawFromAligned(orig.getValue(), instance.getValue());
       });
       wireScrollSync();
+      setupBlockMovePositionTracking();
       applyDecorations();
       publishScrollMetrics();
     };
@@ -565,6 +703,8 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           disposable.dispose(),
         );
         changeActionDisposablesRef.current = [];
+        jsonPasteDisposablesRef.current.forEach((disposable) => disposable.dispose());
+        jsonPasteDisposablesRef.current = [];
       };
     }, []);
 
@@ -665,6 +805,10 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     }, [alignedView.result, theme, activeChangeBlock, showDiffHighlights]);
 
     useEffect(() => {
+      setupBlockMovePositionTracking();
+    }, [setupBlockMovePositionTracking, shouldAlign, changeGroups]);
+
+    useEffect(() => {
       const orig = originalRef.current;
       const mod = modifiedRef.current;
       if (
@@ -688,8 +832,14 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       publishScrollMetrics();
       requestAnimationFrame(() => {
         scrollSyncRef.current = false;
+        updateBlockMoveControlPositions();
       });
-    }, [activeChangeIndex, activeChangeAlignedLine, shouldAlign]);
+    }, [
+      activeChangeIndex,
+      activeChangeAlignedLine,
+      shouldAlign,
+      updateBlockMoveControlPositions,
+    ]);
 
     useEffect(() => {
       publishScrollMetrics();
@@ -769,11 +919,9 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       <ResizableSplitPane
         ratio={splitRatio}
         onRatioChange={onSplitRatioChange ?? (() => undefined)}
-        showBlockMoveControls={shouldAlign && activeChangeIndex >= 0}
-        canMoveBlockLeft={canMoveActiveBlockLeft}
-        canMoveBlockRight={canMoveActiveBlockRight}
-        onMoveBlockLeft={() => applyActiveBlockMove('left')}
-        onMoveBlockRight={() => applyActiveBlockMove('right')}
+        blockMoveControls={shouldAlign ? blockMoveControls : []}
+        onMoveBlockLeft={(groupIndex) => applyBlockMove(groupIndex, 'left')}
+        onMoveBlockRight={(groupIndex) => applyBlockMove(groupIndex, 'right')}
         left={
           <div className="editor-pane relative h-full min-h-0">
             <Editor

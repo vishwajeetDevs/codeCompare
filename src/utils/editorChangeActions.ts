@@ -43,8 +43,15 @@ export function setupChangeContextMenu(
 
     const result = getAlignedResult();
     const group = getChangeGroupForLine(buildChangeGroups(result), lineNumber);
-    canMoveLeftKey.set(group ? canMoveBlockToLeft(result, group) : false);
-    canMoveRightKey.set(group ? canMoveBlockToRight(result, group) : false);
+    const { original, modified } = getEditors();
+    const alignedOriginal = original?.getValue() ?? '';
+    const alignedModified = modified?.getValue() ?? '';
+    canMoveLeftKey.set(
+      group ? canMoveBlockToLeft(result, group, alignedModified) : false,
+    );
+    canMoveRightKey.set(
+      group ? canMoveBlockToRight(result, group, alignedOriginal) : false,
+    );
   };
 
   const contextMenuDisposable = codeEditor.onContextMenu((event) => {
@@ -68,10 +75,10 @@ export function setupChangeContextMenu(
 
     const next =
       direction === 'left'
-        ? canMoveBlockToLeft(result, group)
+        ? canMoveBlockToLeft(result, group, alignedModified)
           ? applyMoveBlockToLeft(alignedOriginal, alignedModified, result, group)
           : null
-        : canMoveBlockToRight(result, group)
+        : canMoveBlockToRight(result, group, alignedOriginal)
           ? applyMoveBlockToRight(alignedOriginal, alignedModified, result, group)
           : null;
 

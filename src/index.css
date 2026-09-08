@@ -194,13 +194,10 @@ button:disabled {
   isolation: isolate;
 }
 
-/* Keep pane elevated while find widget exists (avoids close-tooltip flicker). */
-.editor-pane:has(.find-widget) {
-  z-index: 2;
-}
-
-.editor-pane:focus-within {
-  z-index: 2;
+/* Keep pane elevated while find widget or context menu is open */
+.editor-pane:has(.find-widget.visible),
+.editor-pane:has(.context-view) {
+  z-index: 10;
 }
 
 .editor-pane .monaco-editor .find-widget {
@@ -227,7 +224,7 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
 
 .split-divider {
   position: relative;
-  z-index: 5;
+  z-index: 1;
   cursor: col-resize;
   touch-action: none;
   background: var(--border);
@@ -248,33 +245,58 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
   background: var(--accent);
 }
 
+.split-divider-move-layer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
 .split-divider-move-controls {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 6;
+  left: 0;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 3px;
   transform: translate(-50%, -50%);
-  pointer-events: auto;
+  pointer-events: none;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.split-divider-move-controls.is-active .split-divider-move-btn:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 1px 4px rgba(0, 0, 0, 0.14);
 }
 
 .split-divider-move-btn {
   display: flex;
-  height: 1.75rem;
-  width: 1.75rem;
-  cursor: default;
+  height: 1.375rem;
+  width: 1.375rem;
+  cursor: pointer;
   align-items: center;
   justify-content: center;
-  border-radius: 0.5rem;
   border: 1px solid var(--border);
+  border-radius: 2px;
   background: var(--surface-1);
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
   line-height: 1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  padding: 0;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.split-divider-move-btn:last-child {
+  border-right: 1px solid var(--border);
 }
 
 .split-divider-move-btn:hover:not(:disabled) {
@@ -284,7 +306,8 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
 
 .split-divider-move-btn:disabled {
   cursor: default;
-  opacity: 0.35;
+  opacity: 0.4;
+  color: var(--text-muted);
 }
 
 /* Hide minimap and overview ruler overlays */
@@ -373,12 +396,18 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
 
 .location-pane {
   user-select: none;
+  overflow: hidden;
+}
+
+.location-pane .loc-track {
+  overflow: hidden;
 }
 
 .loc-track {
   background: var(--loc-track-bg);
   border-radius: 2px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .loc-marker {
@@ -409,10 +438,16 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
   z-index: 2;
 }
 
+.loc-viewport {
+  overflow: hidden;
+}
+
 .loc-viewport-thumb {
   background: var(--loc-viewport-bg);
   border: 1px solid var(--loc-viewport-border);
   border-radius: 2px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Compare / Refresh Compare action bar */

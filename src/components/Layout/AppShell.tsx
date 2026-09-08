@@ -89,13 +89,19 @@ export function AppShell() {
     comparison.editorRef.current?.closeFindWidgets();
   }, [comparison.editorRef]);
 
+  const toggleWordWrap = useCallback(() => {
+    comparison.updateSettings({
+      wordWrap: comparison.settings.wordWrap === 'on' ? 'off' : 'on',
+    });
+  }, [comparison.updateSettings, comparison.settings.wordWrap]);
+
   useKeyboardShortcuts({
     onCompare: comparison.compare,
     onSwap: comparison.swap,
     onClear: comparison.clear,
     onShare: comparison.share,
     onToggleSettings: () => setSettingsOpen((open) => !open),
-    onCloseFind: closeFindWidgets,
+    onToggleWordWrap: toggleWordWrap,
     onPrevChange: () => {
       closeFindWidgets();
       changeNav.goPrev();
@@ -183,6 +189,7 @@ export function AppShell() {
             splitRatio={splitRatio}
             onSplitRatioChange={setSplitRatio}
             onScrollMetrics={setScrollMetrics}
+            onToggleWordWrap={toggleWordWrap}
           />
           <CompareActionBar
             visible={comparison.showCompareBar}
