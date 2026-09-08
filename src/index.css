@@ -391,11 +391,27 @@ body:has(.find-widget.visible .codicon-widget-close) .monaco-hover {
 
 /* Comparison tabs */
 .comparison-tab-bar {
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--text-muted) var(--surface-2);
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
 }
 
 .comparison-tab-bar::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.comparison-tab-bar::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+
+.comparison-tab-bar::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 999px;
+}
+
+.comparison-tab-bar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }
 
 .comparison-tab-close {

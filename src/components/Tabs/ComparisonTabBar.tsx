@@ -20,6 +20,7 @@ export function ComparisonTabBar({
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const tabBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!editingTabId) return;
@@ -40,9 +41,18 @@ export function ComparisonTabBar({
 
   return (
     <div
-      className="comparison-tab-bar flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 md:px-4"
+      ref={tabBarRef}
+      className="comparison-tab-bar flex w-full min-w-0 shrink-0 items-center gap-1 overflow-x-scroll border-b border-[var(--border)] bg-[var(--surface-2)] px-2 pb-1 pt-1 md:px-4"
       role="tablist"
       aria-label="Comparison tabs"
+      onWheel={(event) => {
+        const tabBar = tabBarRef.current;
+        if (!tabBar || tabBar.scrollWidth <= tabBar.clientWidth) return;
+        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+        event.preventDefault();
+        tabBar.scrollLeft += event.deltaY;
+      }}
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;

@@ -146,6 +146,12 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     const scrollSyncRef = useRef(false);
     const isSyncingRef = useRef(false);
     const skipExternalSyncRef = useRef(false);
+    const blockMoveViewportRef = useRef<{
+      originalTop: number;
+      originalLeft: number;
+      modifiedTop: number;
+      modifiedLeft: number;
+    } | null>(null);
     const lastRevealedChangeIndexRef = useRef(-1);
     const lastExternalSyncKeyRef = useRef('');
     const scrollDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
@@ -551,6 +557,15 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
 
       if (!next) return;
 
+      const originalScroll = {
+        top: orig.getScrollTop(),
+        left: orig.getScrollLeft(),
+      };
+      const modifiedScroll = {
+        top: mod.getScrollTop(),
+        left: mod.getScrollLeft(),
+      };
+
       isSyncingRef.current = true;
       try {
         orig.setValue(next.original);
@@ -560,10 +575,16 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
       }
 
       const raw = rawFromAligned(next.original, next.modified);
-      markEditorDrivenUpdate();
       if (onBlockMove) {
+        blockMoveViewportRef.current = {
+          originalTop: originalScroll.top,
+          originalLeft: originalScroll.left,
+          modifiedTop: modifiedScroll.top,
+          modifiedLeft: modifiedScroll.left,
+        };
         onBlockMove(raw.original, raw.modified);
       } else {
+        markEditorDrivenUpdate();
         onOriginalChange?.(raw.original);
         onModifiedChange?.(raw.modified);
       }
@@ -775,7 +796,6 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     }, [resolvedLanguage]);
 
     useEffect(() => {
-      lastRevealedChangeIndexRef.current = -1;
       lastExternalSyncKeyRef.current = '';
       skipExternalSyncRef.current = false;
     }, [compareVersion]);
@@ -857,6 +877,38 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     useEffect(() => {
       const orig = originalRef.current;
       const mod = modifiedRef.current;
+
+      const preservedViewport = blockMoveViewportRef.current;
+      const activeIndexIsSettled =
+        changeGroups.length === 0 ||
+        (activeChangeIndex >= 0 && activeChangeIndex < changeGroups.length);
+
+      if (
+        orig &&
+        mod &&
+        shouldAlign &&
+        preservedViewport &&
+        activeIndexIsSettled
+      ) {
+        blockMoveViewportRef.current = null;
+        lastRevealedChangeIndexRef.current = activeChangeIndex;
+        scrollSyncRef.current = true;
+        orig.setScrollPosition({
+          scrollTop: preservedViewport.originalTop,
+          scrollLeft: preservedViewport.originalLeft,
+        });
+        mod.setScrollPosition({
+          scrollTop: preservedViewport.modifiedTop,
+          scrollLeft: preservedViewport.modifiedLeft,
+        });
+        publishScrollMetrics();
+        requestAnimationFrame(() => {
+          scrollSyncRef.current = false;
+          updateBlockMoveControlPositions();
+        });
+        return;
+      }
+
       if (
         !orig ||
         !mod ||
@@ -883,6 +935,8 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     }, [
       activeChangeIndex,
       activeChangeAlignedLine,
+      changeGroups.length,
+      compareVersion,
       shouldAlign,
       updateBlockMoveControlPositions,
     ]);
