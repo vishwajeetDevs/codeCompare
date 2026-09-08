@@ -396,8 +396,7 @@ export function useComparison(
     try {
       const result = await getShareLink(metadata);
       await navigator.clipboard.writeText(result.url);
-      const hint = result.hosted ? ' (saved to database)' : '';
-      showToast(`Share link copied · ${result.displayId}${hint}`, 'success');
+      showToast(`Share link copied · ${result.displayId}`, 'success');
       return result;
     } catch {
       showToast('Could not copy share link', 'error');

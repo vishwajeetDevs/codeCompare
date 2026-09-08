@@ -152,7 +152,7 @@ function EditablePaneLabel({
             setEditing(false);
           }
         }}
-        className="w-full min-w-0 bg-transparent text-center text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)] outline-none"
+        className="w-full min-w-0 bg-transparent text-center text-xs font-semibold tracking-wider text-[var(--text-primary)] outline-none"
         aria-label={`Rename ${fallback} pane`}
       />
     );
@@ -210,7 +210,7 @@ export function DesktopPaneLabels({
   return (
     <div className="hidden border-b border-[var(--border)] bg-[var(--surface-2)] md:flex">
       <div
-        className="shrink-0 border-r border-[var(--border)] px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] md:px-6"
+        className="shrink-0 border-r border-[var(--border)] px-4 py-2 text-center text-xs font-semibold tracking-wider text-[var(--text-muted)] md:px-6"
         style={{ width: leftWidth }}
       >
         <EditablePaneLabel
@@ -224,7 +224,7 @@ export function DesktopPaneLabels({
         style={{ width: SPLIT_DIVIDER_WIDTH_PX }}
         aria-hidden="true"
       />
-      <div className="min-w-0 flex-1 px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] md:px-6">
+      <div className="min-w-0 flex-1 px-4 py-2 text-center text-xs font-semibold tracking-wider text-[var(--text-muted)] md:px-6">
         <EditablePaneLabel
           value={modifiedLabel}
           fallback={DEFAULT_MODIFIED_LABEL}

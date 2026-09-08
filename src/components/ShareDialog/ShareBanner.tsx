@@ -1,7 +1,5 @@
 interface ShareBannerProps {
   displayId?: string;
-  localOnly?: boolean;
-  hosted?: boolean;
   onStartNew: () => void;
   onDismiss: () => void;
 }
@@ -18,9 +16,6 @@ export function ShareBanner({
         {displayId && (
           <span className="ml-2 font-mono">{displayId}</span>
         )}
-        <span className="ml-2 text-[var(--text-muted)]">
-          (database share link)
-        </span>
       </div>
       <div className="flex items-center gap-1.5">
         <button type="button" className="btn-secondary !py-0.5 !text-xs" onClick={onStartNew}>

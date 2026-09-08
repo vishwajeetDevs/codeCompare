@@ -358,8 +358,6 @@ export const ComparisonWorkspace = forwardRef<
       {comparison.sharedView && (
         <ShareBanner
           displayId={comparison.sharedView.displayId}
-          localOnly={comparison.sharedView.localOnly}
-          hosted={comparison.sharedView.hosted}
           onStartNew={comparison.startNew}
           onDismiss={comparison.dismissSharedBanner}
         />

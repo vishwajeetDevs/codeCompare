@@ -18,8 +18,8 @@ export default async function handler(
     const sql = getShareDb();
     if (!sql) {
       return response.status(503).json({
-        error: 'Database unavailable',
-        hint: 'Set DATABASE_URL in Vercel project environment variables.',
+        error: 'Share service unavailable',
+        hint: 'Try again in a moment.',
       });
     }
 
@@ -39,8 +39,8 @@ export default async function handler(
     } catch (error) {
       console.error('Failed to load share:', error);
       return response.status(503).json({
-        error: 'Database unavailable',
-        hint: 'Check DATABASE_URL and Neon database connectivity.',
+        error: 'Share service unavailable',
+        hint: 'Try again in a moment.',
       });
     }
   } catch (error) {
