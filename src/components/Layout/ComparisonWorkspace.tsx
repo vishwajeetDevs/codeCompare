@@ -24,7 +24,12 @@ import { useChangeNavigation } from '../../hooks/useChangeNavigation';
 import { useComparison } from '../../hooks/useComparison';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import type { ThemeMode } from '../../types';
-import type { ComparisonTabState } from '../../types/comparisonTab';
+import {
+  DEFAULT_MODIFIED_LABEL,
+  DEFAULT_ORIGINAL_LABEL,
+  normalizePaneLabel,
+  type ComparisonTabState,
+} from '../../types/comparisonTab';
 import type { EditorScrollMetrics } from '../../types/editor';
 import type { MobileEditorView } from '../../types';
 import { clampSplitRatio } from '../../hooks/useSplitRatio';
@@ -92,8 +97,29 @@ export const ComparisonWorkspace = forwardRef<
   },
   ref,
 ) {
+  const [originalLabel, setOriginalLabel] = useState(tabState.originalLabel);
+  const [modifiedLabel, setModifiedLabel] = useState(tabState.modifiedLabel);
+  const applySharedPaneLabels = useCallback(
+    (sharedOriginalLabel?: string, sharedModifiedLabel?: string) => {
+      setOriginalLabel(
+        normalizePaneLabel(
+          sharedOriginalLabel ?? DEFAULT_ORIGINAL_LABEL,
+          DEFAULT_ORIGINAL_LABEL,
+        ),
+      );
+      setModifiedLabel(
+        normalizePaneLabel(
+          sharedModifiedLabel ?? DEFAULT_MODIFIED_LABEL,
+          DEFAULT_MODIFIED_LABEL,
+        ),
+      );
+    },
+    [],
+  );
+
   const comparison = useComparison(theme, {
     applySharedTheme: setTheme,
+    applySharedPaneLabels,
     persistDraft,
     loadSharedFromUrl,
     initialTabState: tabState,
@@ -108,8 +134,6 @@ export const ComparisonWorkspace = forwardRef<
 
   const isMobile = useIsMobile();
   const [splitRatio, setSplitRatioState] = useState(tabState.splitRatio);
-  const [originalLabel, setOriginalLabel] = useState(tabState.originalLabel);
-  const [modifiedLabel, setModifiedLabel] = useState(tabState.modifiedLabel);
   const [mobileView, setMobileView] = useState<MobileEditorView>('diff');
   const [scrollMetrics, setScrollMetrics] = useState<EditorScrollMetrics | null>(
     null,
@@ -237,6 +261,24 @@ export const ComparisonWorkspace = forwardRef<
     });
   }, [comparison.settings.wordWrap, comparison.updateSettings]);
 
+  const shareMetadata = useMemo(
+    () => ({ originalLabel, modifiedLabel }),
+    [modifiedLabel, originalLabel],
+  );
+  const getShareLink = useCallback(
+    () => comparison.getShareLink(shareMetadata),
+    [comparison.getShareLink, shareMetadata],
+  );
+  const share = useCallback(
+    () => comparison.share(shareMetadata),
+    [comparison.share, shareMetadata],
+  );
+  const copyShareLink = useCallback(
+    (link?: Awaited<ReturnType<typeof getShareLink>>) =>
+      comparison.copyShareLink(link, shareMetadata),
+    [comparison.copyShareLink, shareMetadata],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -246,9 +288,9 @@ export const ComparisonWorkspace = forwardRef<
       compare: comparison.compare,
       swap: comparison.swap,
       clear: comparison.clear,
-      share: comparison.share,
-      getShareLink: comparison.getShareLink,
-      copyShareLink: comparison.copyShareLink,
+      share,
+      getShareLink,
+      copyShareLink,
       showAlignedComparison: comparison.showAlignedComparison,
       changeIndex: comparison.showAlignedComparison
         ? Math.max(changeNav.activeIndex, 0)
@@ -274,7 +316,10 @@ export const ComparisonWorkspace = forwardRef<
       buildPersistedTab,
       changeNav,
       closeFindWidgets,
+      copyShareLink,
       comparison,
+      getShareLink,
+      share,
       splitRatio,
     ],
   );
@@ -304,8 +349,8 @@ export const ComparisonWorkspace = forwardRef<
         }}
         onCloseFind={closeFindWidgets}
         showShortcutButtons={shortcutButtonsVisible}
-        onGetShareLink={comparison.getShareLink}
-        onCopyShareLink={comparison.copyShareLink}
+        onGetShareLink={getShareLink}
+        onCopyShareLink={copyShareLink}
       />
 
       {tabBar}

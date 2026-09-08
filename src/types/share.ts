@@ -10,6 +10,13 @@ export interface SharePayload {
   tabSize?: number;
   insertSpaces?: boolean;
   theme?: 'dark' | 'light';
+  originalLabel?: string;
+  modifiedLabel?: string;
+}
+
+export interface ShareWorkspaceMetadata {
+  originalLabel?: string;
+  modifiedLabel?: string;
 }
 
 export interface StoredShare {

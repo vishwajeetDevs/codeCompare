@@ -11,7 +11,7 @@ import {
 } from '../diff';
 import { computeComparisonStats } from '../diff/stats';
 import type { DownloadKind } from '../types';
-import type { ShareLinkResult } from '../types/share';
+import type { ShareLinkResult, ShareWorkspaceMetadata } from '../types/share';
 import {
   downloadTextFile,
   filenameForLanguage,
@@ -44,6 +44,7 @@ export type ComparisonPhase = 'idle' | 'compared' | 'stale';
 
 export interface UseComparisonOptions {
   applySharedTheme?: (theme: ThemeMode) => void;
+  applySharedPaneLabels?: (originalLabel?: string, modifiedLabel?: string) => void;
   persistDraft?: boolean;
   loadSharedFromUrl?: boolean;
   initialTabState?: ComparisonTabState;
@@ -86,6 +87,7 @@ export function useComparison(
 ) {
   const {
     applySharedTheme,
+    applySharedPaneLabels,
     persistDraft = true,
     loadSharedFromUrl = true,
     initialTabState,
@@ -152,6 +154,7 @@ export function useComparison(
 
       setOriginal(shared.original);
       setModified(shared.modified);
+      applySharedPaneLabels?.(shared.originalLabel, shared.modifiedLabel);
       setSharedView(getShareRouteMeta());
       if (shared.original.trim() && shared.modified.trim()) {
         setSnapshot({ original: shared.original, modified: shared.modified });
@@ -177,6 +180,7 @@ export function useComparison(
         applySharedTheme?.(shared.theme);
       }
       setSharedView(getShareRouteMeta());
+      applySharedPaneLabels?.(shared.originalLabel, shared.modifiedLabel);
       if (shared.original.trim() && shared.modified.trim()) {
         setSnapshot({ original: shared.original, modified: shared.modified });
         setPhase('compared');
@@ -187,7 +191,12 @@ export function useComparison(
     return () => {
       cancelled = true;
     };
-  }, [updateSettings, applySharedTheme, loadSharedFromUrl]);
+  }, [
+    updateSettings,
+    applySharedPaneLabels,
+    applySharedTheme,
+    loadSharedFromUrl,
+  ]);
 
   useEffect(() => {
     if (!persistDraft) return;
@@ -379,13 +388,13 @@ export function useComparison(
     }
   }, [phase, showToast]);
 
-  const getShareLink = useCallback(async () => {
-    return buildShareLink(original, modified, settings, theme);
+  const getShareLink = useCallback(async (metadata?: ShareWorkspaceMetadata) => {
+    return buildShareLink(original, modified, settings, theme, metadata);
   }, [original, modified, settings, theme]);
 
-  const share = useCallback(async () => {
+  const share = useCallback(async (metadata?: ShareWorkspaceMetadata) => {
     try {
-      const result = await getShareLink();
+      const result = await getShareLink(metadata);
       await navigator.clipboard.writeText(result.url);
       const hint = result.hosted ? ' (saved to database)' : '';
       showToast(`Share link copied · ${result.displayId}${hint}`, 'success');
@@ -397,9 +406,9 @@ export function useComparison(
   }, [getShareLink, showToast]);
 
   const copyShareLink = useCallback(
-    async (link?: ShareLinkResult) => {
+    async (link?: ShareLinkResult, metadata?: ShareWorkspaceMetadata) => {
       try {
-        const result = link ?? (await getShareLink());
+        const result = link ?? (await getShareLink(metadata));
         await navigator.clipboard.writeText(result.url);
         return true;
       } catch {

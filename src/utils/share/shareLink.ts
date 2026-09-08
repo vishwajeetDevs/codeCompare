@@ -1,5 +1,9 @@
 import type { EditorSettings } from '../../types/editor';
-import type { ShareLinkResult, SharePayload } from '../../types/share';
+import type {
+  ShareLinkResult,
+  SharePayload,
+  ShareWorkspaceMetadata,
+} from '../../types/share';
 import type { ThemeMode } from '../../types';
 import { encodeSharePayload, decodeSharePayload } from './codec';
 import {
@@ -26,6 +30,7 @@ export async function buildShareLink(
   modified: string,
   settings: EditorSettings,
   theme: ThemeMode,
+  metadata: ShareWorkspaceMetadata = {},
 ): Promise<ShareLinkResult> {
   const encoded = encodeSharePayload({
     original,
@@ -34,6 +39,12 @@ export async function buildShareLink(
     tabSize: settings.tabSize,
     insertSpaces: settings.insertSpaces,
     theme,
+    ...(metadata.originalLabel !== undefined && {
+      originalLabel: metadata.originalLabel,
+    }),
+    ...(metadata.modifiedLabel !== undefined && {
+      modifiedLabel: metadata.modifiedLabel,
+    }),
   });
 
   const preview = previewText(original, modified);

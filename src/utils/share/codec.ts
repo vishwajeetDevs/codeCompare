@@ -22,6 +22,8 @@ interface WirePayloadV2 {
   t?: number;
   s?: boolean;
   h?: SharePayload['theme'];
+  ol?: string;
+  ml?: string;
 }
 
 type WirePayload = WirePayloadV1 | WirePayloadV2;
@@ -32,6 +34,8 @@ function compactMeta(payload: Omit<SharePayload, 'v' | 'original' | 'modified'>)
     ...(payload.tabSize !== undefined && { t: payload.tabSize }),
     ...(payload.insertSpaces !== undefined && { s: payload.insertSpaces }),
     ...(payload.theme !== undefined && { h: payload.theme }),
+    ...(payload.originalLabel !== undefined && { ol: payload.originalLabel }),
+    ...(payload.modifiedLabel !== undefined && { ml: payload.modifiedLabel }),
   };
 }
 
@@ -41,6 +45,8 @@ function expandMeta(wire: WirePayloadV2): Omit<SharePayload, 'v' | 'original' | 
     ...(wire.t !== undefined && { tabSize: wire.t }),
     ...(wire.s !== undefined && { insertSpaces: wire.s }),
     ...(wire.h !== undefined && { theme: wire.h }),
+    ...(wire.ol !== undefined && { originalLabel: wire.ol }),
+    ...(wire.ml !== undefined && { modifiedLabel: wire.ml }),
   };
 }
 
