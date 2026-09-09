@@ -105,7 +105,8 @@ export function setupEditorCopy(
   isAlignedMode: () => boolean,
 ): { dispose: () => void } {
   const editorId = codeEditor.getId();
-  const whenFocused = `editorFocus && editorId == '${editorId}'`;
+  const whenFocused =
+    `editorFocus && editorId == '${editorId}' && !findInputFocussed && !replaceInputFocussed`;
 
   const getPaddingLines = () =>
     isAlignedMode()

@@ -58,6 +58,19 @@ function disableCloseButtonTooltip(findWidget: HTMLElement): () => void {
   return suppressManagedHover(closeButton);
 }
 
+function isFindWidgetTextField(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement {
+  return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+}
+
+function handleFindWidgetSelectAll(event: KeyboardEvent): void {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return;
+  if (!isFindWidgetTextField(event.target)) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  event.target.select();
+}
+
 function bindFindWidgetEvents(container: HTMLElement): () => void {
   const cleanups: Array<() => void> = [];
 
@@ -73,11 +86,13 @@ function bindFindWidgetEvents(container: HTMLElement): () => void {
 
     findWidget.addEventListener('mousedown', stopBubble, true);
     findWidget.addEventListener('pointerdown', stopBubble, true);
+    findWidget.addEventListener('keydown', handleFindWidgetSelectAll, true);
     cleanups.push(disableCloseButtonTooltip(findWidget));
 
     cleanups.push(() => {
       findWidget.removeEventListener('mousedown', stopBubble, true);
       findWidget.removeEventListener('pointerdown', stopBubble, true);
+      findWidget.removeEventListener('keydown', handleFindWidgetSelectAll, true);
       delete findWidget.dataset.codecompareBound;
     });
   };
