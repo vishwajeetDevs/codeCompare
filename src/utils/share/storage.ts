@@ -19,7 +19,9 @@ function writeStore(items: StoredShare[]): void {
 }
 
 export function saveShareRecord(record: StoredShare): void {
-  const items = readStore().filter((item) => item.id !== record.id);
+  const items = readStore().filter(
+    (item) => item.id !== record.id && item.encoded !== record.encoded,
+  );
   items.unshift(record);
   writeStore(items);
 }

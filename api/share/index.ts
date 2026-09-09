@@ -39,8 +39,8 @@ export default async function handler(
     }
 
     try {
-      const id = await insertShare(sql, data, preview);
-      return response.status(201).json({ id });
+      const result = await insertShare(sql, data, preview);
+      return response.status(result.created ? 201 : 200).json({ id: result.id });
     } catch (error) {
       if (error instanceof Error && error.message === 'Payload too large') {
         return response.status(413).json({ error: 'Payload too large' });
