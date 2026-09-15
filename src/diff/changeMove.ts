@@ -180,3 +180,57 @@ export function applyMoveBlockToRight(
 
   return changed ? { original, modified } : null;
 }
+
+/** Copy every applicable modified-side block to the original pane. */
+export function applyMoveBlocksToLeft(
+  alignedOriginal: string,
+  alignedModified: string,
+  result: LineDiffResult,
+  groups: ChangeGroup[],
+): { original: string; modified: string } | null {
+  let current = { original: alignedOriginal, modified: alignedModified };
+  let changed = false;
+
+  for (const group of [...groups].sort(
+    (left, right) => left.alignedLineStart - right.alignedLineStart,
+  )) {
+    const next = applyMoveBlockToLeft(
+      current.original,
+      current.modified,
+      result,
+      group,
+    );
+    if (!next) continue;
+    current = next;
+    changed = true;
+  }
+
+  return changed ? current : null;
+}
+
+/** Copy every applicable original-side block to the modified pane. */
+export function applyMoveBlocksToRight(
+  alignedOriginal: string,
+  alignedModified: string,
+  result: LineDiffResult,
+  groups: ChangeGroup[],
+): { original: string; modified: string } | null {
+  let current = { original: alignedOriginal, modified: alignedModified };
+  let changed = false;
+
+  for (const group of [...groups].sort(
+    (left, right) => left.alignedLineStart - right.alignedLineStart,
+  )) {
+    const next = applyMoveBlockToRight(
+      current.original,
+      current.modified,
+      result,
+      group,
+    );
+    if (!next) continue;
+    current = next;
+    changed = true;
+  }
+
+  return changed ? current : null;
+}

@@ -34,6 +34,7 @@ import { setupEditorSearch, setupEditorWordWrapShortcut, closeFindWidget } from 
 import { formatDetectedCode, preloadFormatters } from '../../utils/codeFormatter';
 import { PaneFormatLoadingBar } from '../Layout/Layout';
 import { setupEditorCopy } from '../../utils/editorCopy';
+import { setupEditorHistory } from '../../utils/editorHistory';
 import { setupChangeContextMenu } from '../../utils/editorChangeActions';
 import { ResizableSplitPane } from '../Layout/ResizableSplitPane';
 import type { BlockMoveControlMarker } from '../Layout/ResizableSplitPane';
@@ -175,6 +176,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
     const onScrollMetricsRef = useRef(onScrollMetrics);
     onScrollMetricsRef.current = onScrollMetrics;
     const copyDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const historyDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const searchDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const changeActionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const wordWrapDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
@@ -743,6 +745,9 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
             isAlignedMode,
           ),
         );
+        historyDisposablesRef.current.push(
+          setupEditorHistory(instance, monacoRef.current),
+        );
         changeActionDisposablesRef.current.push(
           setupChangeContextMenu(
             instance,
@@ -805,6 +810,9 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
             isAlignedMode,
           ),
         );
+        historyDisposablesRef.current.push(
+          setupEditorHistory(instance, monacoRef.current),
+        );
         changeActionDisposablesRef.current.push(
           setupChangeContextMenu(
             instance,
@@ -857,6 +865,10 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
         scrollDisposablesRef.current = [];
         copyDisposablesRef.current.forEach((disposable) => disposable.dispose());
         copyDisposablesRef.current = [];
+        historyDisposablesRef.current.forEach((disposable) =>
+          disposable.dispose(),
+        );
+        historyDisposablesRef.current = [];
         searchDisposablesRef.current.forEach((disposable) => disposable.dispose());
         searchDisposablesRef.current = [];
         changeActionDisposablesRef.current.forEach((disposable) =>
