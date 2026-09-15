@@ -11,7 +11,7 @@ export function setupEditorHistory(
 ): { dispose: () => void } {
   const editorId = codeEditor.getId();
   const whenTextFocused =
-    `editorTextFocus && editorId == '${editorId}' && ` +
+    `editorFocus && editorId == '${editorId}' && ` +
     '!findInputFocussed && !replaceInputFocussed';
 
   const undo = () => {

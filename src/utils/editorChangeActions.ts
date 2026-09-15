@@ -16,11 +16,10 @@ interface EditorPair {
 }
 
 function groupsForCurrentSelection(
-  codeEditor: editor.IStandaloneCodeEditor,
+  selections: readonly editor.ICursorSelectionChangedEvent['selection'][],
   groups: ChangeGroup[],
   contextLine: number,
 ): ChangeGroup[] {
-  const selections = codeEditor.getSelections() ?? [];
   const contextIsSelected = selections.some(
     (selection) =>
       contextLine >= selection.startLineNumber &&
@@ -42,6 +41,24 @@ function groupsForCurrentSelection(
   return contextGroup ? [contextGroup] : [];
 }
 
+function replaceEditorContents(
+  codeEditor: editor.IStandaloneCodeEditor,
+  value: string,
+): void {
+  const model = codeEditor.getModel();
+  if (!model || model.getValue() === value) return;
+
+  codeEditor.pushUndoStop();
+  codeEditor.executeEdits('codecompare.moveChanges', [
+    {
+      range: model.getFullModelRange(),
+      text: value,
+      forceMoveMarkers: true,
+    },
+  ]);
+  codeEditor.pushUndoStop();
+}
+
 export function setupChangeContextMenu(
   codeEditor: editor.IStandaloneCodeEditor,
   paneId: 'original' | 'modified',
@@ -59,19 +76,24 @@ export function setupChangeContextMenu(
     false,
   );
 
-  let contextLine = 1;
+  let contextGroups: ChangeGroup[] = [];
+  let selectionsAtRightClick = codeEditor.getSelections() ?? [];
+  const domNode = codeEditor.getDomNode();
 
-  const refreshContextKeys = (lineNumber: number) => {
-    contextLine = lineNumber;
+  const refreshContextKeys = (
+    lineNumber: number,
+    selections = codeEditor.getSelections() ?? [],
+  ) => {
     if (!isAlignedMode()) {
+      contextGroups = [];
       canMoveLeftKey.set(false);
       canMoveRightKey.set(false);
       return;
     }
 
     const result = getAlignedResult();
-    const groups = groupsForCurrentSelection(
-      codeEditor,
+    contextGroups = groupsForCurrentSelection(
+      selections,
       buildChangeGroups(result),
       lineNumber,
     );
@@ -79,20 +101,27 @@ export function setupChangeContextMenu(
     const alignedOriginal = original?.getValue() ?? '';
     const alignedModified = modified?.getValue() ?? '';
     canMoveLeftKey.set(
-      groups.some((group) =>
+      contextGroups.some((group) =>
         canMoveBlockToLeft(result, group, alignedModified),
       ),
     );
     canMoveRightKey.set(
-      groups.some((group) =>
+      contextGroups.some((group) =>
         canMoveBlockToRight(result, group, alignedOriginal),
       ),
     );
   };
 
+  const captureRightClickSelection = (event: MouseEvent) => {
+    if (event.button === 2) {
+      selectionsAtRightClick = codeEditor.getSelections() ?? [];
+    }
+  };
+  domNode?.addEventListener('mousedown', captureRightClickSelection, true);
+
   const contextMenuDisposable = codeEditor.onContextMenu((event) => {
     const lineNumber = event.target.position?.lineNumber;
-    if (lineNumber) refreshContextKeys(lineNumber);
+    if (lineNumber) refreshContextKeys(lineNumber, selectionsAtRightClick);
   });
 
   const cursorDisposable = codeEditor.onDidChangeCursorSelection((event) => {
@@ -106,11 +135,7 @@ export function setupChangeContextMenu(
     const alignedOriginal = original.getValue();
     const alignedModified = modified.getValue();
     const result = getAlignedResult();
-    const groups = groupsForCurrentSelection(
-      codeEditor,
-      buildChangeGroups(result),
-      contextLine,
-    );
+    const groups = contextGroups;
     if (groups.length === 0) return;
 
     const next =
@@ -130,8 +155,11 @@ export function setupChangeContextMenu(
 
     if (!next) return;
 
-    original.setValue(next.original);
-    modified.setValue(next.modified);
+    if (direction === 'left') {
+      replaceEditorContents(original, next.original);
+    } else {
+      replaceEditorContents(modified, next.modified);
+    }
     onMerged(next.original, next.modified);
   };
 
@@ -155,6 +183,7 @@ export function setupChangeContextMenu(
 
   return {
     dispose: () => {
+      domNode?.removeEventListener('mousedown', captureRightClickSelection, true);
       contextMenuDisposable.dispose();
       cursorDisposable.dispose();
       canMoveLeftKey.reset();
