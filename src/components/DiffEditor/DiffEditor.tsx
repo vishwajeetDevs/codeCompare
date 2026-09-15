@@ -746,7 +746,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           ),
         );
         historyDisposablesRef.current.push(
-          setupEditorHistory(instance, monacoRef.current),
+          setupEditorHistory(instance),
         );
         changeActionDisposablesRef.current.push(
           setupChangeContextMenu(
@@ -811,7 +811,7 @@ export const CompareEditor = forwardRef<CompareEditorHandle, DiffEditorProps>(
           ),
         );
         historyDisposablesRef.current.push(
-          setupEditorHistory(instance, monacoRef.current),
+          setupEditorHistory(instance),
         );
         changeActionDisposablesRef.current.push(
           setupChangeContextMenu(

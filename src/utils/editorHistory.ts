@@ -1,4 +1,3 @@
-import type { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 
 /**
@@ -7,35 +6,33 @@ import type { editor } from 'monaco-editor';
  */
 export function setupEditorHistory(
   codeEditor: editor.IStandaloneCodeEditor,
-  monaco: Monaco,
 ): { dispose: () => void } {
-  const editorId = codeEditor.getId();
-  const whenTextFocused =
-    `editorFocus && editorId == '${editorId}' && ` +
-    '!findInputFocussed && !replaceInputFocussed';
+  const domNode = codeEditor.getDomNode();
+  if (!domNode) return { dispose: () => undefined };
 
-  const undo = () => {
-    void codeEditor.getModel()?.undo();
+  const handleHistoryShortcut = (event: KeyboardEvent) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (!codeEditor.hasTextFocus()) return;
+
+    const key = event.key.toLowerCase();
+    const shouldUndo = key === 'z' && !event.shiftKey;
+    const shouldRedo = key === 'y' || (key === 'z' && event.shiftKey);
+    if (!shouldUndo && !shouldRedo) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    const model = codeEditor.getModel();
+    if (shouldUndo) void model?.undo();
+    else void model?.redo();
   };
-  const redo = () => {
-    void codeEditor.getModel()?.redo();
+
+  domNode.addEventListener('keydown', handleHistoryShortcut, true);
+
+  return {
+    dispose: () => {
+      domNode.removeEventListener('keydown', handleHistoryShortcut, true);
+    },
   };
-
-  codeEditor.addCommand(
-    monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyZ,
-    undo,
-    whenTextFocused,
-  );
-  codeEditor.addCommand(
-    monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY,
-    redo,
-    whenTextFocused,
-  );
-  codeEditor.addCommand(
-    monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyZ,
-    redo,
-    whenTextFocused,
-  );
-
-  return { dispose: () => undefined };
 }

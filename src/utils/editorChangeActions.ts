@@ -20,22 +20,15 @@ function groupsForCurrentSelection(
   groups: ChangeGroup[],
   contextLine: number,
 ): ChangeGroup[] {
-  const contextIsSelected = selections.some(
-    (selection) =>
-      contextLine >= selection.startLineNumber &&
-      contextLine <= selection.endLineNumber,
+  const selectedGroups = groups.filter((group) =>
+    selections.some(
+      (selection) =>
+        !selection.isEmpty() &&
+        group.alignedLineStart <= selection.endLineNumber &&
+        group.alignedLineEnd >= selection.startLineNumber,
+    ),
   );
-
-  if (contextIsSelected) {
-    const selectedGroups = groups.filter((group) =>
-      selections.some(
-        (selection) =>
-          group.alignedLineStart <= selection.endLineNumber &&
-          group.alignedLineEnd >= selection.startLineNumber,
-      ),
-    );
-    if (selectedGroups.length > 0) return selectedGroups;
-  }
+  if (selectedGroups.length > 0) return selectedGroups;
 
   const contextGroup = getChangeGroupForLine(groups, contextLine);
   return contextGroup ? [contextGroup] : [];
@@ -101,14 +94,16 @@ export function setupChangeContextMenu(
     const alignedOriginal = original?.getValue() ?? '';
     const alignedModified = modified?.getValue() ?? '';
     canMoveLeftKey.set(
-      contextGroups.some((group) =>
-        canMoveBlockToLeft(result, group, alignedModified),
-      ),
+      paneId === 'modified' &&
+        contextGroups.some((group) =>
+          canMoveBlockToLeft(result, group, alignedModified),
+        ),
     );
     canMoveRightKey.set(
-      contextGroups.some((group) =>
-        canMoveBlockToRight(result, group, alignedOriginal),
-      ),
+      paneId === 'original' &&
+        contextGroups.some((group) =>
+          canMoveBlockToRight(result, group, alignedOriginal),
+        ),
     );
   };
 
